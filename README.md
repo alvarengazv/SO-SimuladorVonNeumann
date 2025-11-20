@@ -796,4 +796,66 @@ O `CMakeLists.txt` foi configurado para criar atalhos úteis que você pode usar
 - Matheus Emanuel da Silva ([matheus-emanue123](https://github.com/matheus-emanue123))
 
 
+## 📨 Contato dos Responsáveis por este Repositório
 
+<div align="center">
+<i>Élcio Costa Amorim Neto - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor1]
+[![Linkedin][linkedin-badge]][linkedin-autor1]
+[![Telegram][telegram-badge]][telegram-autor1]
+
+<br><br>
+
+
+<i>Guilherme Alvarenga de Azevedo - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor2]
+[![Linkedin][linkedin-badge]][linkedin-autor2]
+[![Telegram][telegram-badge]][telegram-autor2]
+
+<br><br>
+
+
+<i>João Paulo Cunha Faria - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor3]
+[![Linkedin][linkedin-badge]][linkedin-autor3]
+[![Telegram][telegram-badge]][telegram-autor3]
+
+<br><br>
+
+
+<i>Maria Eduarda Teixeira Souza - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor4]
+[![Linkedin][linkedin-badge]][linkedin-autor4]
+[![Telegram][telegram-badge]][telegram-autor4]
+
+<p align="right">(<a href="#readme-topo">voltar ao topo</a>)</p>
+
+</div>
+
+[linkedin-badge]: https://img.shields.io/badge/-LinkedIn-0077B5?style=for-the-badge&logo=Linkedin&logoColor=white
+[telegram-badge]: https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white
+[gmail-badge]: https://img.shields.io/badge/-Gmail-D14836?style=for-the-badge&logo=Gmail&logoColor=white
+
+[linkedin-autor1]: https://www.linkedin.com/in/%C3%A9lcio-amorim-0210532a2/
+[telegram-autor1]: https://t.me
+[gmail-autor1]: mailto:elcioamorim12@gmail.com
+
+[linkedin-autor2]: https://www.linkedin.com/in/guilherme-alvarenga-de-azevedo-959474201/
+[telegram-autor2]: https://t.me/alvarengazv
+[gmail-autor2]: mailto:gui.alvarengas234@gmail.com
+
+[linkedin-autor3]: https://www.linkedin.com/in/jo%C3%A3o-paulo-cunha-faria/
+[telegram-autor3]:  https://t.me
+[gmail-autor3]: mailto:joaopaulofaria98@gmail.com
+
+[linkedin-autor4]: https://www.linkedin.com/in/dudatsouza/
+[telegram-autor4]: https://t.me/
+[gmail-autor4]: mailto:dudateixeirasouza@gmail.com
