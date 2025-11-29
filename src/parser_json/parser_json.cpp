@@ -1,5 +1,5 @@
 #include "parser_json.hpp"
-#include "../memory/MemoryManager.hpp" // Alterado de MainMemory.hpp
+#include "../cpu/MemoryManager.hpp" // Alterado de MainMemory.hpp
 #include "../cpu/PCB.hpp"              // Incluído para a função write
 #include <unordered_map>
 #include <fstream>

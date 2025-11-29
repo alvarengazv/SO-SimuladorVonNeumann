@@ -1,29 +1,19 @@
 #include "cachePolicy.hpp"
 
+CachePolicy::CachePolicy() {}
 
-CachePolicy :: CachePolicy() {
-    
-}
+CachePolicy::~CachePolicy() {}
 
-CachePolicy :: ~CachePolicy() {
-
-}
-
-bool CachePolicy :: erase(std :: unordered_map<size_t, CacheEntry> &cacheMap) {
-
-    int menorTempo = INT_MAX;
-    size_t enderecoRemover = SIZE_MAX;
-    for(const auto &x : cacheMap){
-        if(x.second.timestamp < menorTempo && !x.second.isDirty){
-            menorTempo = x.second.timestamp;
-            enderecoRemover = x.first;
-        }
+// Implementação da política FIFO
+size_t CachePolicy::getAddressToReplace(std::queue<size_t>& fifo_queue) {
+    if (fifo_queue.empty()) {
+        return -1; // Retorna -1 se não houver nada para remover
     }
-    
-    if(enderecoRemover != SIZE_MAX){
-        cacheMap.erase(enderecoRemover);
-        return true;
-    } else{
-        return false;
-    }
+
+    // Pega o primeiro endereço que entrou na fila
+    size_t address_to_remove = fifo_queue.front();
+    // Remove da fila
+    fifo_queue.pop();
+
+    return address_to_remove;
 }

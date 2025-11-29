@@ -9,8 +9,8 @@
 #include <string>
 #include <atomic>
 #include <cstdint>
-#include "../memory/cache.hpp"
-#include "REGISTER_BANK.hpp" // necessidade de objeto completo dentro do PCB
+#include "cache/cache.hpp"
+#include "datapath/REGISTER_BANK.hpp" // necessidade de objeto completo dentro do PCB
 
 
 // Estados possíveis do processo (simplificado)

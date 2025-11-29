@@ -27,7 +27,9 @@ MODULE_SRCS := $(wildcard src/cpu/*.cpp) \
                $(wildcard src/process_scheduler/*.cpp) \
 			   $(wildcard src/tasks/*.cpp) \
 			   $(wildcard src/metrics/*.cpp) \
-			   $(wildcard src/simulator/*.cpp)
+			   $(wildcard src/simulator/*.cpp) \
+               $(wildcard src/cpu/cache/*.cpp) \
+               $(wildcard src/cpu/datapath/*.cpp) \
 
 # Junta o main com os módulos
 SRC := $(MAIN_SRC) $(MODULE_SRCS)
@@ -37,7 +39,7 @@ OBJ := $(SRC:.cpp=.o)
 SRC_HASH := src/test_hash_register.cpp
 OBJ_HASH := $(SRC_HASH:.cpp=.o)
 
-SRC_BANK := src/test_register_bank.cpp src/cpu/REGISTER_BANK.cpp
+SRC_BANK := src/test_register_bank.cpp src/cpu/datapath/REGISTER_BANK.cpp
 OBJ_BANK := $(SRC_BANK:.cpp=.o)
 
 # ==========================================

@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../system_config/system_config.hpp"
-#include "../memory/MemoryManager.hpp"
+#include "../cpu/MemoryManager.hpp"
 #include "../IO/IOManager.hpp"
 #include "../cpu/PCB.hpp"
 #include "../process_scheduler/process_scheduler.hpp"

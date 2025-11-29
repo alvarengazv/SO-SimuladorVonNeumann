@@ -1,10 +1,10 @@
 #ifndef CONTROL_UNIT_HPP
 #define CONTROL_UNIT_HPP
 
-#include "REGISTER_BANK.hpp" // Incluído diretamente para ter a definição completa
-#include "ULA.hpp"
-#include "HASH_REGISTER.hpp"
-#include "../memory/cache.hpp"
+#include "datapath/REGISTER_BANK.hpp" // Incluído diretamente para ter a definição completa
+#include "datapath/ULA.hpp"
+#include "datapath/HASH_REGISTER.hpp"
+#include "cache/cache.hpp"
 #include <unordered_map>
 #include <string>
 #include <vector>

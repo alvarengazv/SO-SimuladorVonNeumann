@@ -19,13 +19,13 @@ set(SIMULATOR_SOURCES
     src/main.cpp
     src/cpu/CONTROL_UNIT.cpp
     src/cpu/pcb_loader.cpp
-    src/cpu/REGISTER_BANK.cpp
-    src/cpu/ULA.cpp
+    src/cpu/datapath/REGISTER_BANK.cpp
+    src/cpu/datapath/ULA.cpp
+    src/cpu/cache/cache.cpp
+    src/cpu/cache/cachePolicy.cpp
+    src/cpu/MemoryManager.cpp
     src/IO/IOManager.cpp
-    src/memory/cache.cpp
-    src/memory/cachePolicy.cpp
     src/memory/MAIN_MEMORY.cpp
-    src/memory/MemoryManager.cpp
     src/memory/SECONDARY_MEMORY.cpp
     src/parser_json/parser_json.cpp
 )
@@ -49,19 +49,19 @@ add_custom_command(TARGET simulador POST_BUILD
 # --- ALVOS DE TESTE (CADA UM COM SUAS DEPENDÊNCIAS) ---
 # (O restante do arquivo continua igual...)
 add_executable(test_hash src/test/test_hash_register.cpp)
-add_executable(test_bank src/test/test_register_bank.cpp src/cpu/REGISTER_BANK.cpp)
-add_executable(test_ula src/test/teste_alu.cpp src/cpu/ULA.cpp)
+add_executable(test_bank src/test/test_register_bank.cpp src/cpu/datapath/REGISTER_BANK.cpp)
+add_executable(test_ula src/test/teste_alu.cpp src/cpu/datapath/ULA.cpp)
 add_executable(test_metrics 
     src/test/test_cpu_metrics.cpp 
     src/cpu/CONTROL_UNIT.cpp 
     src/cpu/pcb_loader.cpp 
-    src/cpu/ULA.cpp 
-    src/cpu/REGISTER_BANK.cpp
-    src/memory/MemoryManager.cpp
+    src/cpu/datapath/ULA.cpp 
+    src/cpu/datapath/REGISTER_BANK.cpp
+    src/cpu/MemoryManager.cpp
     src/memory/MAIN_MEMORY.cpp
     src/memory/SECONDARY_MEMORY.cpp
-    src/memory/cache.cpp
-    src/memory/cachePolicy.cpp
+    src/cpu/cache/cache.cpp
+    src/cpu/cache/cachePolicy.cpp
     src/IO/IOManager.cpp
     src/parser_json/parser_json.cpp
 )

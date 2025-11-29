@@ -49,18 +49,6 @@ k1    : 0x00000000  (Decimal: 0)
 
 
 === Operações Executadas ===
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
-[ARIT] ADD zero = zero(0) ADD zero(0) = 0
 [ARIT] SUB t1 = t0(0) SUB t1(5) = -5
 [ARIT] DIV zero = zero(0) DIV zero(0) = 0
 

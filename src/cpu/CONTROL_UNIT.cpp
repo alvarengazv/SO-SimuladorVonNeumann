@@ -2,7 +2,7 @@
 #include "pcb_loader.hpp"
 #include <fstream>
 #include "CONTROL_UNIT.hpp"
-#include "../memory/MemoryManager.hpp"
+#include "MemoryManager.hpp"
 #include "PCB.hpp"
 #include "../IO/IOManager.hpp"
 
