@@ -1,8 +1,9 @@
-#ifndef PROCESS_SCALER_HPP
-#define PROCESS_SCALER_HPP
+#ifndef PROCESS_SCHEDULER_HPP
+#define PROCESS_SCHEDULER_HPP
+  
  
 #include "../cpu/PCB.hpp"
-#include "SCALER.hpp"
+#include "SCHEDULER.hpp"
 
 #include <cstdint>
 #include <cstddef> 
@@ -15,14 +16,14 @@
 using namespace std;
  
    
-class ProcessScaler {
+class ProcessScheduler {
 private: 
-    Scaler scalerEnum;
+    Scheduler scalerEnum;
     vector<PCB*> process;
 public:
-    ProcessScaler(Scaler scaler,vector<PCB *> process); 
+    ProcessScheduler(Scheduler scaler,vector<PCB *> process); 
 
-    PCB* scaler(vector<PCB*> process);
+    PCB* scheduler(vector<PCB*> process);
     PCB* first_come_first_served(vector<PCB*> process);
     PCB* shortest_job_first(vector<PCB*> process);
     PCB* shortest_remainign_time_first(vector<PCB*> process);

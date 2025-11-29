@@ -12,8 +12,8 @@
 #include "cpu/CONTROL_UNIT.hpp"
 #include "memory/MemoryManager.hpp"
 #include "parser_json/parser_json.hpp"
-#include "process_scaler/PROCESS_SCALER.hpp"
-#include "process_scaler/SCALER.hpp"
+#include "process_scheduler/PROCESS_SCHEDULER.hpp"
+#include "process_scheduler/SCHEDULER.hpp"
 #include "IO/IOManager.hpp"
 
 // Função para imprimir as métricas de um processo
@@ -156,7 +156,7 @@ int main()
     }
 
 
-    ProcessScaler sc(Scaler::PRIORITY, ready_process);
+    ProcessScheduler sc(Scheduler::PRIORITY, ready_process);
 
     int total_processes = process_list.size();
     int finished_processes = 0;
@@ -190,7 +190,7 @@ int main()
             continue;
         }
 
-        PCB *current_process = sc.scaler(ready_process);
+        PCB *current_process = sc.scheduler(ready_process);
         ready_process.erase(std::remove(ready_process.begin(),ready_process.end(),current_process),ready_process.end());
 
         std::cout << "\n[Scheduler] Executando processo " << current_process->pid << " (Quantum: " << current_process->quantum << ")"<< " (Prioridade: " << current_process->priority<<").\n";

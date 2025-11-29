@@ -1,8 +1,8 @@
-#ifndef SCALER_HPP
-#define SCALER_HPP
+#ifndef SCHEDULER_HPP
+#define SCHEDULER_HPP
 
 
-enum class Scaler {
+enum class Scheduler{
     ROUND_ROBIN,
     FIRST_COME_FIRST_SERVED,
     SHORTES_JOB_FIRST,

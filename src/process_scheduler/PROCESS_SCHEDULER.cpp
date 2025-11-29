@@ -1,27 +1,27 @@
-#include "PROCESS_SCALER.hpp"
-#include "SCALER.hpp"
+#include "PROCESS_SCHEDULER.hpp"
+#include "SCHEDULER.hpp"
 
-ProcessScaler::ProcessScaler(Scaler scalerEnum, vector<PCB *> process)
+ProcessScheduler::ProcessScheduler(Scheduler scalerEnum, vector<PCB *> process)
 {
     this->scalerEnum = scalerEnum;
     this->process = process;
     switch (this->scalerEnum)
     {
 
-    case Scaler::ROUND_ROBIN:
+    case Scheduler::ROUND_ROBIN:
         this->setQuantum();
         break;
  
-    case Scaler::SHORTES_JOB_FIRST:
+    case Scheduler::SHORTES_JOB_FIRST:
         this->setQuantum();
         break;
 
-    case Scaler::SHORTES_REMAINING_TIME_FIRST:
+    case Scheduler::SHORTES_REMAINING_TIME_FIRST:
         this->setQuantum();
         this->setTimeStamp();
         break;
 
-    case Scaler::PRIORITY:
+    case Scheduler::PRIORITY:
         this->setPriority();
         break;
     default:
@@ -29,7 +29,7 @@ ProcessScaler::ProcessScaler(Scaler scalerEnum, vector<PCB *> process)
     }
 }
 
-void ProcessScaler::setQuantum()
+void ProcessScheduler::setQuantum()
 {
     for (int i = 0; i < this->process.size(); i++)
     {
@@ -47,7 +47,7 @@ void ProcessScaler::setQuantum()
 }
 
 
-void ProcessScaler::setPriority()
+void ProcessScheduler::setPriority()
 {
     for (int i = 0; i < this->process.size(); i++)
     {
@@ -65,7 +65,7 @@ void ProcessScaler::setPriority()
     }
 }
 
-void ProcessScaler::setTimeStamp()
+void ProcessScheduler::setTimeStamp()
 {
     for (int i = 0; i < this->process.size(); i++)
     {
@@ -73,29 +73,29 @@ void ProcessScaler::setTimeStamp()
     }
 }
 
-PCB *ProcessScaler::scaler(vector<PCB *> process)
+PCB *ProcessScheduler::scheduler(vector<PCB *> process)
 {
 
     switch (this->scalerEnum)
     {
 
-    case Scaler::ROUND_ROBIN:
+    case Scheduler::ROUND_ROBIN:
         return round_robin(process);
         break;
 
-    case Scaler::FIRST_COME_FIRST_SERVED:
+    case Scheduler::FIRST_COME_FIRST_SERVED:
         return first_come_first_served(process);
         break;
 
-    case Scaler::SHORTES_JOB_FIRST:
+    case Scheduler::SHORTES_JOB_FIRST:
         return shortest_job_first(process);
         break;
 
-    case Scaler::SHORTES_REMAINING_TIME_FIRST:
+    case Scheduler::SHORTES_REMAINING_TIME_FIRST:
         return shortest_remainign_time_first(process);
         break;
 
-    case Scaler::PRIORITY:
+    case Scheduler::PRIORITY:
         return priority(process);
         break;
     default:
@@ -104,7 +104,7 @@ PCB *ProcessScaler::scaler(vector<PCB *> process)
     }
 }
 
-PCB *ProcessScaler::shortest_job_first(vector<PCB *> process)
+PCB *ProcessScheduler::shortest_job_first(vector<PCB *> process)
 {
     if (process.empty()) return nullptr;
 
@@ -120,7 +120,7 @@ PCB *ProcessScaler::shortest_job_first(vector<PCB *> process)
     return selected_process;
 }
 
-PCB *ProcessScaler::shortest_remainign_time_first(vector<PCB *> process)
+PCB *ProcessScheduler::shortest_remainign_time_first(vector<PCB *> process)
 {
     if (process.empty()) return nullptr;
 
@@ -141,13 +141,13 @@ PCB *ProcessScaler::shortest_remainign_time_first(vector<PCB *> process)
     return (selected_process != nullptr) ? selected_process : process.front();
 }
 
-PCB *ProcessScaler::round_robin(vector<PCB *> process)
+PCB *ProcessScheduler::round_robin(vector<PCB *> process)
 {
     if (process.empty()) return nullptr;
     return process.front();
 }
 
-PCB *ProcessScaler::priority(vector<PCB *> process)
+PCB *ProcessScheduler::priority(vector<PCB *> process)
 {
     if (process.empty()) return nullptr;
 
@@ -165,7 +165,7 @@ PCB *ProcessScaler::priority(vector<PCB *> process)
     return selected_process;
 }
 
-PCB *ProcessScaler::first_come_first_served(vector<PCB *> process)
+PCB *ProcessScheduler::first_come_first_served(vector<PCB *> process)
 {
     if (process.empty()) return nullptr;
     return process.front();
