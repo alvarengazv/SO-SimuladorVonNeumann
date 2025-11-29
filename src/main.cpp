@@ -7,16 +7,18 @@
 #include <filesystem>
 #include <fstream>
 
-
 #include "cpu/PCB.hpp"
 #include "cpu/pcb_loader.hpp"
 #include "cpu/CONTROL_UNIT.hpp"
 #include "memory/MemoryManager.hpp"
 #include "parser_json/parser_json.hpp"
+#include "process_scaler/PROCESS_SCALER.hpp"
+#include "process_scaler/SCALER.hpp"
 #include "IO/IOManager.hpp"
 
 // Função para imprimir as métricas de um processo
-void print_metrics(const PCB& pcb) {
+void print_metrics(const PCB &pcb)
+{
     std::cout << "\n--- METRICAS FINAIS DO PROCESSO " << pcb.pid << " ---\n";
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
     std::cout << "Estado Final:           " << (pcb.state == State::Finished ? "Finished" : "Incomplete") << "\n";
@@ -36,7 +38,8 @@ void print_metrics(const PCB& pcb) {
     std::ofstream resultados("output/resultados.dat");
     std::ofstream output("output/output.dat");
 
-    if (resultados.is_open()) {
+    if (resultados.is_open())
+    {
         resultados << "=== Resultados de Execução ===\n";
         resultados << "PID: " << pcb.pid << "\n";
         resultados << "Nome: " << pcb.name << "\n";
@@ -49,8 +52,8 @@ void print_metrics(const PCB& pcb) {
         resultados << "Ciclos de IO: " << pcb.io_cycles << "\n";
     }
 
-
-    if (output.is_open()) {
+    if (output.is_open())
+    {
         output << "=== Saída Lógica do Programa ===\n";
 
         // Dump de registradores
@@ -62,11 +65,14 @@ void print_metrics(const PCB& pcb) {
 
         // Lê o arquivo temporário com operações
         std::string temp_filename = "output/temp_1.log";
-        if (std::filesystem::exists(temp_filename)) {
+        if (std::filesystem::exists(temp_filename))
+        {
             std::ifstream temp_file(temp_filename);
-            if (temp_file.is_open()) {
+            if (temp_file.is_open())
+            {
                 std::string line;
-                while (std::getline(temp_file, line)) {
+                while (std::getline(temp_file, line))
+                {
                     output << line << "\n";
                 }
                 temp_file.close();
@@ -74,21 +80,21 @@ void print_metrics(const PCB& pcb) {
 
             // Remove arquivo temporário após consolidar
             std::filesystem::remove(temp_filename);
-        } else {
+        }
+        else
+        {
             output << "(Nenhuma operação registrada)\n";
         }
 
         output << "\n=== Fim das Operações Registradas ===\n";
     }
 
-
-
     resultados.close();
     output.close();
 }
 
-
-int main() {
+int main()
+{
     // 1. Inicialização dos Módulos Principais
     std::cout << "Inicializando o simulador...\n";
     MemoryManager memManager(1024, 8192);
@@ -96,56 +102,98 @@ int main() {
 
     // 2. Carregamento dos Processos
     std::vector<std::unique_ptr<PCB>> process_list;
-    std::deque<PCB*> ready_queue;
-    std::vector<PCB*> blocked_list;
+    std::vector<PCB *> ready_process;
+    std::vector<PCB *> blocked_list;
 
     // Carrega um processo a partir de um arquivo JSON
     auto p1 = std::make_unique<PCB>();
     // CORREÇÃO: Caminho simplificado
-    if (load_pcb_from_json("process1.json", *p1)) {
+    if (load_pcb_from_json("process1.json", *p1))
+    {
         // CORREÇÃO: Caminho simplificado
         std::cout << "Carregando programa 'tasks.json' para o processo " << p1->pid << "...\n";
-        loadJsonProgram("tasks.json", memManager, *p1, 0);
+        loadJsonProgram("src/tasks/tasks.json", memManager, *p1, 0);
         process_list.push_back(std::move(p1));
-    } else {
+    }
+    else
+    {
         std::cerr << "Erro ao carregar 'process1.json'. Certifique-se de que o arquivo está na pasta raiz do projeto.\n";
         return 1;
     }
 
-    // Adiciona os processos na fila de prontos
-    for (const auto& process : process_list) {
-        ready_queue.push_back(process.get());
+    auto p2 = std::make_unique<PCB>();
+    if (load_pcb_from_json("process2.json", *p2))
+    {
+        // CORREÇÃO: Caminho simplificado
+        std::cout << "Carregando programa 'tasks_counter.json' para o processo " << p2->pid << "...\n";
+        loadJsonProgram("src/tasks/tasks_counter.json", memManager, *p2, 0);
+        process_list.push_back(std::move(p2));
     }
+    else
+    {
+        std::cerr << "Erro ao carregar 'process2.json'. Certifique-se de que o arquivo está na pasta raiz do projeto.\n";
+        return 1;
+    }
+
+    auto p3 = std::make_unique<PCB>();
+    if (load_pcb_from_json("process3.json", *p3))
+    {
+        // CORREÇÃO: Caminho simplificado
+        std::cout << "Carregando programa 'tasks_io.json' para o processo " << p3->pid << "...\n";
+        loadJsonProgram("src/tasks/tasks_io.json", memManager, *p3, 0);
+        process_list.push_back(std::move(p3));
+    }
+    else
+    {
+        std::cerr << "Erro ao carregar 'process3.json'. Certifique-se de que o arquivo está na pasta raiz do projeto.\n";
+        return 1;
+    }
+
+    // Adiciona os processos na fila de prontos
+    for (const auto &process : process_list)
+    {
+        ready_process.push_back(process.get());
+    }
+
+
+    ProcessScaler sc(Scaler::PRIORITY, ready_process);
 
     int total_processes = process_list.size();
     int finished_processes = 0;
 
-    // 3. Loop Principal do Escalonador
+    // 3. Loop Principal do Escalonador 
     std::cout << "\nIniciando escalonador Round-Robin...\n";
-    while (finished_processes < total_processes) {
+    while (finished_processes < total_processes)
+    {
         // Verifica se há processos que foram desbloqueados pelo IOManager
-        for (auto it = blocked_list.begin(); it != blocked_list.end(); ) {
-            if ((*it)->state == State::Ready) {
+        for (auto it = blocked_list.begin(); it != blocked_list.end();)
+        {
+            if ((*it)->state == State::Ready)
+            {
                 std::cout << "[Scheduler] Processo " << (*it)->pid << " desbloqueado e movido para a fila de prontos.\n";
-                ready_queue.push_back(*it);
+                ready_process.push_back(*it);
                 it = blocked_list.erase(it);
-            } else {
+            }
+            else
+            {
                 ++it;
             }
         }
 
-        if (ready_queue.empty()) {
-            if (blocked_list.empty()) {
+        if (ready_process.empty())
+        {
+            if (blocked_list.empty())
+            {
                 break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
 
-        PCB* current_process = ready_queue.front();
-        ready_queue.pop_front();
+        PCB *current_process = sc.scaler(ready_process);
+        ready_process.erase(std::remove(ready_process.begin(),ready_process.end(),current_process),ready_process.end());
 
-        std::cout << "\n[Scheduler] Executando processo " << current_process->pid << " (Quantum: " << current_process->quantum << ").\n";
+        std::cout << "\n[Scheduler] Executando processo " << current_process->pid << " (Quantum: " << current_process->quantum << ")"<< " (Prioridade: " << current_process->priority<<").\n";
         current_process->state = State::Running;
 
         std::vector<std::unique_ptr<IORequest>> io_requests;
@@ -155,30 +203,29 @@ int main() {
         Core(memManager, *current_process, &io_requests, print_lock);
 
         // Avalia o estado do processo após a execução
-        switch (current_process->state) {
-            case State::Blocked:
-                std::cout << "[Scheduler] Processo " << current_process->pid << " bloqueado por I/O. Entregando ao IOManager.\n";
-                ioManager.registerProcessWaitingForIO(current_process);
-                blocked_list.push_back(current_process);
-                break;
+        switch (current_process->state)
+        {
+        case State::Blocked:
+            std::cout << "[Scheduler] Processo " << current_process->pid << " bloqueado por I/O. Entregando ao IOManager.\n";
+            ioManager.registerProcessWaitingForIO(current_process);
+            blocked_list.push_back(current_process);
+            break;
 
-            case State::Finished:
-                std::cout << "[Scheduler] Processo " << current_process->pid << " finalizado.\n";
-                print_metrics(*current_process);
-                finished_processes++;
-                break;
+        case State::Finished:
+            std::cout << "[Scheduler] Processo " << current_process->pid << " finalizado.\n";
+            print_metrics(*current_process);
+            finished_processes++;
+            break;
 
-            default:
-                std::cout << "[Scheduler] Quantum do processo " << current_process->pid << " expirou. Voltando para a fila.\n";
-                current_process->state = State::Ready;
-                ready_queue.push_back(current_process);
-                break;
+        default:
+            std::cout << "[Scheduler] Quantum do processo " << current_process->pid << " expirou. Voltando para a fila.\n";
+            current_process->state = State::Ready;
+            ready_process.push_back(current_process);
+            break;
         }
     }
 
     std::cout << "\nTodos os processos foram finalizados. Encerrando o simulador.\n";
-
-    
 
     return 0;
 }

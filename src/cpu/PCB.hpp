@@ -9,7 +9,7 @@
 #include <string>
 #include <atomic>
 #include <cstdint>
-#include "memory/cache.hpp"
+#include "../memory/cache.hpp"
 #include "REGISTER_BANK.hpp" // necessidade de objeto completo dentro do PCB
 
 
@@ -31,6 +31,7 @@ struct PCB {
     int pid = 0;
     std::string name;
     int quantum = 0;
+    int timeStamp;
     int priority = 0;
 
     State state = State::Ready;

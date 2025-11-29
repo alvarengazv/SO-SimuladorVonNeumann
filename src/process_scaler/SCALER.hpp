@@ -1,0 +1,13 @@
+#ifndef SCALER_HPP
+#define SCALER_HPP
+
+
+enum class Scaler {
+    ROUND_ROBIN,
+    FIRST_COME_FIRST_SERVED,
+    SHORTES_JOB_FIRST,
+    SHORTES_REMAINING_TIME_FIRST,
+    PRIORITY
+};
+
+#endif
