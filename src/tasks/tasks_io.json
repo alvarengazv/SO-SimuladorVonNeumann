@@ -1,0 +1,26 @@
+{
+  "metadata": { "task_id": "mem_ops", "description": "Transferencia de dados memoria" },
+  "data": { 
+      "src_array": [10, 20, 30, 40, 50],
+      "dst_array": [0, 0, 0, 0, 0],
+      "idx": 0,
+      "limit": 5
+  },
+  "program": [
+    { "instruction": "li", "rt": "$t0", "immediate": 0 }, 
+    { "instruction": "lw", "rt": "$t1", "offset": 0, "base": "limit" },
+
+    { "label": "copy_loop", "instruction": "beq", "rs": "$t0", "rt": "$t1", "label": "done" },
+    
+    { "instruction": "lw", "rt": "$t2", "offset": 0, "base": "src_array" }, 
+    { "instruction": "addi", "rt": "$t2", "rs": "$t2", "immediate": 1 }, 
+    { "instruction": "sw", "rt": "$t2", "offset": 0, "base": "dst_array" },
+    
+    { "instruction": "print", "rt": "$t2" },
+    
+    { "instruction": "addi", "rt": "$t0", "rs": "$t0", "immediate": 1 },
+    { "instruction": "j", "label": "copy_loop" },
+
+    { "label": "done", "instruction": "end" }
+  ]
+}

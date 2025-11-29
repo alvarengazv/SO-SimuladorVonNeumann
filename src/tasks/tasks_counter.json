@@ -1,0 +1,13 @@
+{
+  "metadata": { "task_id": "counter_test", "description": "Contagem regressiva simples" },
+  "data": { "start_val": 20, "current": 0 },
+  "program": [
+    { "instruction": "lw", "rt": "$t0", "offset": 0, "base": "start_val" },
+    { "label": "loop_start", "instruction": "beq", "rs": "$t0", "rt": "$zero", "label": "end_prog" },
+    { "instruction": "print", "rt": "$t0" },
+    { "instruction": "addi", "rt": "$t0", "rs": "$t0", "immediate": -1 },
+    { "instruction": "sw", "rt": "$t0", "offset": 0, "base": "current" },
+    { "instruction": "j", "label": "loop_start" },
+    { "label": "end_prog", "instruction": "end" }
+  ]
+}
