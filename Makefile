@@ -24,7 +24,7 @@ MODULE_SRCS := $(wildcard src/cpu/*.cpp) \
                $(wildcard src/memory/*.cpp) \
                $(wildcard src/IO/*.cpp) \
                $(wildcard src/parser_json/*.cpp) \
-               $(wildcard src/process_scaler/*.cpp) \
+               $(wildcard src/process_scheduler/*.cpp) \
                $(wildcard src/tasks/*.cpp)
 
 # Junta o main com os módulos

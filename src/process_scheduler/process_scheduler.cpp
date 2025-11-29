@@ -1,27 +1,27 @@
-#include "PROCESS_SCHEDULER.hpp"
-#include "SCHEDULER.hpp"
+#include "process_scheduler.hpp"
+#include "scheduler.hpp"
 
-ProcessScheduler::ProcessScheduler(Scheduler scalerEnum, vector<PCB *> process)
+ProcessScheduler::ProcessScheduler(int schedulerInt, vector<PCB *> process)
 {
-    this->scalerEnum = scalerEnum;
+    this->schedulerInt = schedulerInt;
     this->process = process;
-    switch (this->scalerEnum)
+    switch (schedulerInt)
     {
 
-    case Scheduler::ROUND_ROBIN:
-        this->setQuantum();
-        break;
- 
-    case Scheduler::SHORTES_JOB_FIRST:
+    case 0:
         this->setQuantum();
         break;
 
-    case Scheduler::SHORTES_REMAINING_TIME_FIRST:
+    case 1:
+        this->setQuantum();
+        break;
+
+    case 2:
         this->setQuantum();
         this->setTimeStamp();
         break;
 
-    case Scheduler::PRIORITY:
+    case 3:
         this->setPriority();
         break;
     default:
@@ -45,7 +45,6 @@ void ProcessScheduler::setQuantum()
         this->process.at(i)->quantum = random_number;
     }
 }
-
 
 void ProcessScheduler::setPriority()
 {
@@ -76,26 +75,22 @@ void ProcessScheduler::setTimeStamp()
 PCB *ProcessScheduler::scheduler(vector<PCB *> process)
 {
 
-    switch (this->scalerEnum)
+    switch (this->schedulerInt)
     {
 
-    case Scheduler::ROUND_ROBIN:
+    case 0:
         return round_robin(process);
         break;
 
-    case Scheduler::FIRST_COME_FIRST_SERVED:
-        return first_come_first_served(process);
-        break;
-
-    case Scheduler::SHORTES_JOB_FIRST:
+    case 1:
         return shortest_job_first(process);
         break;
 
-    case Scheduler::SHORTES_REMAINING_TIME_FIRST:
+    case 2:
         return shortest_remainign_time_first(process);
         break;
 
-    case Scheduler::PRIORITY:
+    case 3:
         return priority(process);
         break;
     default:
@@ -106,13 +101,14 @@ PCB *ProcessScheduler::scheduler(vector<PCB *> process)
 
 PCB *ProcessScheduler::shortest_job_first(vector<PCB *> process)
 {
-    if (process.empty()) return nullptr;
+    if (process.empty())
+        return nullptr;
 
     PCB *selected_process = process[0];
 
     for (const auto &p : process)
     {
-          if (p->quantum < selected_process->quantum)
+        if (p->quantum < selected_process->quantum)
         {
             selected_process = p;
         }
@@ -122,14 +118,15 @@ PCB *ProcessScheduler::shortest_job_first(vector<PCB *> process)
 
 PCB *ProcessScheduler::shortest_remainign_time_first(vector<PCB *> process)
 {
-    if (process.empty()) return nullptr;
+    if (process.empty())
+        return nullptr;
 
     PCB *selected_process = nullptr;
     int min_remaining_time = std::numeric_limits<int>::max();
 
     for (const auto &p : process)
     {
-         int remaining_time = p->quantum - p->timeStamp;
+        int remaining_time = p->quantum - p->timeStamp;
 
         if (remaining_time < min_remaining_time)
         {
@@ -137,36 +134,38 @@ PCB *ProcessScheduler::shortest_remainign_time_first(vector<PCB *> process)
             selected_process = p;
         }
     }
-    
+
     return (selected_process != nullptr) ? selected_process : process.front();
 }
 
 PCB *ProcessScheduler::round_robin(vector<PCB *> process)
 {
-    if (process.empty()) return nullptr;
+    if (process.empty())
+        return nullptr;
     return process.front();
 }
 
 PCB *ProcessScheduler::priority(vector<PCB *> process)
 {
-    if (process.empty()) return nullptr;
+    if (process.empty())
+        return nullptr;
 
     PCB *selected_process = process[0];
 
     for (const auto &p : process)
     {
-        
+
         if (p->priority < selected_process->priority)
         {
             selected_process = p;
         }
-        
     }
     return selected_process;
 }
 
 PCB *ProcessScheduler::first_come_first_served(vector<PCB *> process)
 {
-    if (process.empty()) return nullptr;
+    if (process.empty())
+        return nullptr;
     return process.front();
 }

@@ -3,7 +3,7 @@
   
  
 #include "../cpu/PCB.hpp"
-#include "SCHEDULER.hpp"
+#include "scheduler.hpp"
 
 #include <cstdint>
 #include <cstddef> 
@@ -18,10 +18,10 @@ using namespace std;
    
 class ProcessScheduler {
 private: 
-    Scheduler scalerEnum;
+    int schedulerInt;
     vector<PCB*> process;
 public:
-    ProcessScheduler(Scheduler scaler,vector<PCB *> process); 
+    ProcessScheduler(int scaler,vector<PCB *> process); 
 
     PCB* scheduler(vector<PCB*> process);
     PCB* first_come_first_served(vector<PCB*> process);

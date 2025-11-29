@@ -12,8 +12,9 @@
 #include "cpu/CONTROL_UNIT.hpp"
 #include "memory/MemoryManager.hpp"
 #include "parser_json/parser_json.hpp"
-#include "process_scheduler/PROCESS_SCHEDULER.hpp"
-#include "process_scheduler/SCHEDULER.hpp"
+#include "process_scheduler/process_scheduler.hpp"
+#include "process_scheduler/scheduler.hpp"
+#include "system_config/system_config.hpp"
 #include "IO/IOManager.hpp"
 
 // Função para imprimir as métricas de um processo
@@ -97,7 +98,8 @@ int main()
 {
     // 1. Inicialização dos Módulos Principais
     std::cout << "Inicializando o simulador...\n";
-    MemoryManager memManager(1024, 8192);
+    SystemConfig config = SystemConfig::loadFromFile("system_config.json");
+    MemoryManager memManager(config.main_memory.total,config.secondary_memory.total);
     IOManager ioManager;
 
     // 2. Carregamento dos Processos
@@ -156,7 +158,7 @@ int main()
     }
 
 
-    ProcessScheduler sc(Scheduler::PRIORITY, ready_process);
+    ProcessScheduler sc(config.scheduling.algorithm, ready_process);
 
     int total_processes = process_list.size();
     int finished_processes = 0;

@@ -1,0 +1,23 @@
+{
+    "main_memory": {
+        "total": 8192,
+        "page_size": 256,
+        "weight": 50
+    },
+    "secondary_memory": {
+        "total": 65536,
+        "block_size": 512,
+        "weight": 500
+    },
+    "cache": {
+        "size": 2048,
+        "line_size": 64,
+        "weight": 1
+    },
+    "cpu": {
+        "cores": 4
+    },
+    "scheduling": {
+        "algorithm": 0
+    }
+}
