@@ -7,7 +7,7 @@ CXX := g++
 # ==========================================
 # NOMES DOS EXECUTÁVEIS
 # ==========================================
-TARGET := simulador
+TARGET := src/simulador
 TARGET_HASH := test_hash_register
 TARGET_BANK := test_register_bank
 
@@ -25,7 +25,9 @@ MODULE_SRCS := $(wildcard src/cpu/*.cpp) \
                $(wildcard src/IO/*.cpp) \
                $(wildcard src/parser_json/*.cpp) \
                $(wildcard src/process_scheduler/*.cpp) \
-               $(wildcard src/tasks/*.cpp)
+			   $(wildcard src/tasks/*.cpp) \
+			   $(wildcard src/metrics/*.cpp) \
+			   $(wildcard src/simulator/*.cpp)
 
 # Junta o main com os módulos
 SRC := $(MAIN_SRC) $(MODULE_SRCS)

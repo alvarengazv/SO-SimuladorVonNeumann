@@ -700,7 +700,7 @@ Este comando compila o projeto (se necessário) e o executa em seguida.
 make run
 ```
 
-**Arquivos Necessários:** O simulador precisa dos arquivos `process1.json` e `tasks.json` para rodar. O sistema de build está configurado para copiá-los automaticamente para a pasta `build` durante a compilação.
+**Arquivos Necessários:** O simulador precisa dos arquivos `src/pcbs/process1.json` e `src/tasks/tasks.json` para rodar. O sistema de build está configurado para copiá-los automaticamente para a pasta `build` durante a compilação.
 
 ### 🧪 Como Rodar os Testes
 

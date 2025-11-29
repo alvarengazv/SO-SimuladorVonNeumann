@@ -1,6 +1,7 @@
 # Arquivos compilados e de build
 *.o
 build/
+src/simulador
 
 # Arquivos do VS Code
 .vscode/

@@ -38,7 +38,7 @@ target_link_libraries(simulador PRIVATE pthread)
 # Esta seção garante que os arquivos .json estejam junto do executável
 add_custom_command(TARGET simulador POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_SOURCE_DIR}/process1.json
+        ${CMAKE_SOURCE_DIR}/src/pcbs/process1.json
         ${CMAKE_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/src/tasks/tasks.json

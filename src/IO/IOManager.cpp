@@ -14,8 +14,8 @@ IOManager::IOManager() :
 {
     srand(time(nullptr));
 
-    resultFile.open("result.dat", std::ios::app);
-    outputFile.open("output.dat", std::ios::app);
+    resultFile.open("output/result.dat", std::ios::app);
+    outputFile.open("output/output.dat", std::ios::app);
 
     if (!resultFile || !outputFile) {
         std::cerr << "Erro: não foi possível abrir arquivos de saída." << std::endl;

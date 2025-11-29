@@ -1,0 +1,10 @@
+=== Resultados de Execução ===
+PID: 3
+Nome: io_bound_sim
+Quantum: 80
+Prioridade: 0
+Ciclos de Pipeline: 26
+Ciclos de Memória: 376
+Cache Hits: 12
+Cache Misses: 49
+Ciclos de IO: 1

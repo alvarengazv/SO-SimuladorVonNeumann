@@ -38,7 +38,7 @@ static uint32_t makeJ(uint8_t opcode /*6 bits*/, uint32_t addr26) {
 int main() {
     // Carrega PCB do JSON
     PCB pcb{};
-    if (!load_pcb_from_json("process1.json", pcb)) {
+    if (!load_pcb_from_json("src/pcbs/process1.json", pcb)) {
         std::cerr << "[WARN] Falha ao carregar process1.json. Usando valores padrão.\n";
         pcb.pid = 1; pcb.name = "fallback"; pcb.quantum = 50; pcb.priority = 0;
     }
