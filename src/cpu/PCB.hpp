@@ -33,6 +33,7 @@ struct PCB {
     int quantum = 0;
     int timeStamp;
     int priority = 0;
+    int instructions;
 
     State state = State::Ready;
     hw::REGISTER_BANK regBank;

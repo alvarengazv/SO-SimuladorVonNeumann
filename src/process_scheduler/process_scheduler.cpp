@@ -108,7 +108,7 @@ PCB *ProcessScheduler::shortest_job_first(vector<PCB *> process)
 
     for (const auto &p : process)
     {
-        if (p->quantum < selected_process->quantum)
+        if (p->instructions < selected_process->instructions)
         {
             selected_process = p;
         }
@@ -126,7 +126,7 @@ PCB *ProcessScheduler::shortest_remainign_time_first(vector<PCB *> process)
 
     for (const auto &p : process)
     {
-        int remaining_time = p->quantum - p->timeStamp;
+        int remaining_time = p->instructions - p->timeStamp;
 
         if (remaining_time < min_remaining_time)
         {

@@ -123,7 +123,8 @@ void Simulator::moveUnblockedProcesses() {
 void Simulator::executeProcess(PCB &process, int &finishedProcesses) {
     std::cout << "\n[Scheduler] Executando processo " << process.pid
               << " (Quantum: " << process.quantum
-              << ") (Prioridade: " << process.priority << ").\n";
+              << ") (Prioridade: " << process.priority << ")"
+              << ") (Intruções: " << process.instructions << ").\n";
     process.state = State::Running;
 
     std::vector<std::unique_ptr<IORequest>> ioRequests;
