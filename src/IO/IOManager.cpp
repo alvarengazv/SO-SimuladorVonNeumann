@@ -14,7 +14,7 @@ IOManager::IOManager() :
 {
     srand(time(nullptr));
 
-    resultFile.open("output/result.dat", std::ios::app);
+    resultFile.open("output/resultados.dat", std::ios::app);
     outputFile.open("output/output.dat", std::ios::app);
 
     if (!resultFile || !outputFile) {

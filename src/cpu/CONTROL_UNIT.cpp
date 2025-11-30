@@ -76,6 +76,19 @@ static std::string toBinStr(uint32_t v, int width) {
 static inline void account_pipeline_cycle(PCB &p) { p.pipeline_cycles.fetch_add(1); }
 static inline void account_stage(PCB &p) { p.stage_invocations.fetch_add(1); }
 
+std::string Control_Unit::resolveRegisterName(const std::string &bits) const {
+    if (bits.empty()) {
+        return "";
+    }
+
+    try {
+        uint32_t index = binaryStringToUint(bits);
+        return this->map.getRegisterName(index);
+    } catch (...) {
+        return "";
+    }
+}
+
 string Control_Unit::Get_immediate(const uint32_t instruction) {
     uint16_t imm = static_cast<uint16_t>(instruction & 0xFFFFu);
     return std::bitset<16>(imm).to_string();
@@ -165,6 +178,7 @@ void Control_Unit::Fetch(ControlContext &context) {
 
 void Control_Unit::Decode(hw::REGISTER_BANK &registers, Instruction_Data &data) {
     uint32_t instruction = registers.ir.read();
+    data = Instruction_Data{};
     data.rawInstruction = instruction;
     data.op = Identificacao_instrucao(instruction, registers);
 
@@ -203,6 +217,16 @@ void Control_Unit::Decode(hw::REGISTER_BANK &registers, Instruction_Data &data) 
             data.addressRAMResult.clear();
             data.immediate = 0;
         }
+
+        if (!data.source_register.empty()) {
+            data.sourceRegisterName = resolveRegisterName(data.source_register);
+        }
+        if (!data.target_register.empty()) {
+            data.targetRegisterName = resolveRegisterName(data.target_register);
+        }
+        if (!data.destination_register.empty()) {
+            data.destinationRegisterName = resolveRegisterName(data.destination_register);
+        }
     }
 
     // === TRACE DECODE ===
@@ -228,10 +252,14 @@ void Control_Unit::Decode(hw::REGISTER_BANK &registers, Instruction_Data &data) 
 
 
 void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data) {
-    std::string name_rs = this->map.getRegisterName(binaryStringToUint(data.source_register));
-    std::string name_rt = this->map.getRegisterName(binaryStringToUint(data.target_register));
+    std::string name_rs = data.sourceRegisterName;
+    std::string name_rt = data.targetRegisterName;
 
-    int32_t val_rs = registers.readRegister(name_rs);
+    if (name_rt.empty()) {
+        return;
+    }
+
+    int32_t val_rs = name_rs.empty() ? 0 : static_cast<int32_t>(registers.readRegister(name_rs));
     int32_t imm = data.immediate; // já sign-extended
 
     std::ostringstream ss;
@@ -243,7 +271,10 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
         alu.B = imm;
         alu.op = ADD;
         alu.calculate();
-        registers.writeRegister(name_rt, alu.result);
+        data.writeRegisterName = name_rt;
+        data.writesRegister = true;
+        data.hasAluResult = true;
+        data.aluResult = alu.result;
 
         ss << "[IMM] " << data.op << " "
            << name_rt << " = " << name_rs << "(" << val_rs << ") + "
@@ -255,7 +286,10 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
     // SLTI
     if (data.op == "SLTI") {
         int32_t res = (val_rs < imm) ? 1 : 0;
-        registers.writeRegister(name_rt, res);
+        data.writeRegisterName = name_rt;
+        data.writesRegister = true;
+        data.hasAluResult = true;
+        data.aluResult = res;
 
         ss << "[IMM] SLTI " << name_rt << " = (" << name_rs << "(" << val_rs
            << ") < " << imm << ") ? 1 : 0 -> " << res;
@@ -267,7 +301,10 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
     if (data.op == "LUI") {
         uint32_t uimm = static_cast<uint32_t>(static_cast<uint16_t>(imm));
         int32_t val = static_cast<int32_t>(uimm << 16);
-        registers.writeRegister(name_rt, val);
+        data.writeRegisterName = name_rt;
+        data.writesRegister = true;
+        data.hasAluResult = true;
+        data.aluResult = val;
 
         ss << "[IMM] LUI " << name_rt << " = (0x" << std::hex << imm
            << " << 16) -> 0x" << val << std::dec;
@@ -277,7 +314,10 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
 
     // LI
     if (data.op == "LI") {
-        registers.writeRegister(name_rt, imm);
+        data.writeRegisterName = name_rt;
+        data.writesRegister = true;
+        data.hasAluResult = true;
+        data.aluResult = imm;
 
         ss << "[IMM] LI " << name_rt << " = " << imm;
         log_operation(ss.str());
@@ -291,9 +331,13 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
 }
 
 void Control_Unit::Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data) {
-    std::string name_rs = this->map.getRegisterName(binaryStringToUint(data.source_register));
-    std::string name_rt = this->map.getRegisterName(binaryStringToUint(data.target_register));
-    std::string name_rd = this->map.getRegisterName(binaryStringToUint(data.target_register));
+    std::string name_rs = data.sourceRegisterName;
+    std::string name_rt = data.targetRegisterName;
+    std::string name_rd = data.destinationRegisterName;
+
+    if (name_rs.empty() || name_rt.empty() || name_rd.empty()) {
+        return;
+    }
 
     int32_t val_rs = registers.readRegister(name_rs);
     int32_t val_rt = registers.readRegister(name_rt);
@@ -309,7 +353,10 @@ void Control_Unit::Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Ins
     else return;
 
     alu.calculate();
-    registers.writeRegister(name_rd, alu.result);
+    data.writeRegisterName = name_rd;
+    data.writesRegister = true;
+    data.hasAluResult = true;
+    data.aluResult = alu.result;
 
     std::ostringstream ss;
     ss << "[ARIT] " << data.op << " " << name_rd
@@ -341,39 +388,80 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
     }
 }
 
-void Control_Unit::Execute_Loop_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data,
-                                          int &counter, int &counterForEnd, bool &programEnd,
-                                          MemoryManager &memManager, PCB &process) {
-    string name_rs = this->map.getRegisterName(binaryStringToUint(data.source_register));
-    string name_rt = this->map.getRegisterName(binaryStringToUint(data.target_register));
+void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext &context) {
+    std::string name_rs = data.sourceRegisterName;
+    std::string name_rt = data.targetRegisterName;
+
+    if (name_rs.empty()) {
+        return;
+    }
 
     ALU alu;
-    alu.A = registers.readRegister(name_rs);
-    alu.B = registers.readRegister(name_rt);
+    alu.A = context.registers.readRegister(name_rs);
+    alu.B = name_rt.empty() ? 0 : context.registers.readRegister(name_rt);
 
     bool jump = false;
-    if (data.op == "BEQ") { alu.op = BEQ; alu.calculate(); if (alu.result == 1) jump = true; }
-    else if (data.op == "BNE") { alu.op = BNE; alu.calculate(); if (alu.result == 1) jump = true; }
+    if (data.op == "BEQ") { alu.op = BEQ; alu.calculate(); jump = (alu.result == 1); }
+    else if (data.op == "BNE") { alu.op = BNE; alu.calculate(); jump = (alu.result == 1); }
     else if (data.op == "J") { jump = true; }
-    else if (data.op == "BLT") { alu.op = BLT; alu.calculate(); if (alu.result == 1) jump = true; }
-    else if (data.op == "BGT") { alu.op = BGT; alu.calculate(); if (alu.result == 1) jump = true; }
+    else if (data.op == "BLT") { alu.op = BLT; alu.calculate(); jump = (alu.result == 1); }
+    else if (data.op == "BGT") { alu.op = BGT; alu.calculate(); jump = (alu.result == 1); }
 
-    if (jump) {
+    if (jump && !data.addressRAMResult.empty()) {
         uint32_t addr = binaryStringToUint(data.addressRAMResult);
-        // TRACE BRANCH/JUMP
-        // std::cout << "[BRANCH] OP=" << data.op << " taken, new PC=" << addr << "\n";
-
-        registers.pc.write(addr);
-        registers.ir.write(memManager.read(registers.pc.read(), process));
-        counter = 0; counterForEnd = 5; programEnd = false;
+        context.registers.pc.write(addr);
+        FlushPipeline(context);
+        context.endProgram = false;
     }
 }
 
 void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
 
+    auto assignAddress = [&data]() {
+        if (data.addressRAMResult.empty()) {
+            return false;
+        }
+        try {
+            data.effectiveAddress = binaryStringToUint(data.addressRAMResult);
+            data.hasEffectiveAddress = true;
+            return true;
+        } catch (...) {
+            data.hasEffectiveAddress = false;
+            return false;
+        }
+    };
+
+    if (data.op == "LW") {
+        if (assignAddress() && !data.targetRegisterName.empty()) {
+            data.pendingMemoryRead = true;
+            data.writeRegisterName = data.targetRegisterName;
+            data.writesRegister = true;
+        }
+        return;
+    }
+
+    if (data.op == "SW") {
+        if (assignAddress() && !data.targetRegisterName.empty()) {
+            data.pendingMemoryWrite = true;
+            data.storeValue = static_cast<int32_t>(context.registers.readRegister(data.targetRegisterName));
+        }
+        return;
+    }
+
+    if (data.op == "LA") {
+        if (assignAddress() && !data.targetRegisterName.empty()) {
+            data.writeRegisterName = data.targetRegisterName;
+            data.writesRegister = true;
+            data.hasAluResult = true;
+            data.aluResult = static_cast<int32_t>(data.effectiveAddress);
+        }
+        return;
+    }
+
     // Immediates / I-type arithmetic
-    if (data.op == "ADDI" || data.op == "ADDIU" || data.op == "SLTI" || data.op == "LUI" || data.op == "LI") {
+    if (data.op == "ADDI" || data.op == "ADDIU" || data.op == "SLTI" || data.op == "LUI" ||
+        data.op == "LI") {
         Execute_Immediate_Operation(context.registers, data);
         return;
     }
@@ -382,7 +470,7 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
         Execute_Aritmetic_Operation(context.registers, data);
     } else if (data.op == "BEQ" || data.op == "J" || data.op == "BNE" || data.op == "BGT" || data.op == "BGTI" || data.op == "BLT" || data.op == "BLTI") {
-        Execute_Loop_Operation(context.registers, data, context.counter, context.counterForEnd, context.endProgram, context.memManager, context.process);
+        Execute_Loop_Operation(data, context);
     } else if (data.op == "PRINT") {
         Execute_Operation(data, context);
     }
@@ -390,30 +478,25 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
 
 void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
-    string name_rt = this->map.getRegisterName(binaryStringToUint(data.target_register));
-    if (data.op == "LW") {
-        uint32_t addr = binaryStringToUint(data.addressRAMResult);
-        int value = context.memManager.read(addr, context.process);
-        context.registers.writeRegister(name_rt, value);
+    if (data.pendingMemoryRead && data.hasEffectiveAddress) {
+        int value = context.memManager.read(data.effectiveAddress, context.process);
+        data.loadResult = value;
+        data.hasLoadResult = true;
+        data.pendingMemoryRead = false;
+    }
 
-        // std::cout << "[MEMORY] LW addr=" << addr << " value=" << value
-        //           << " -> " << name_rt << "\n";
-    } else if (data.op == "LA" || data.op == "LI") {
-        uint32_t val = binaryStringToUint(data.addressRAMResult);
-        context.registers.writeRegister(name_rt, static_cast<int>(val));
+    if (data.pendingMemoryWrite && data.hasEffectiveAddress) {
+        context.memManager.write(data.effectiveAddress, data.storeValue, context.process);
+        data.pendingMemoryWrite = false;
+    }
 
-        // std::cout << "[MEMORY] " << data.op << " -> " << name_rt
-        //           << " value=" << static_cast<int>(val) << "\n";
-    } else if (data.op == "PRINT" && data.target_register.empty()) {
+    if (data.op == "PRINT" && data.target_register.empty() && !data.addressRAMResult.empty()) {
         uint32_t addr = binaryStringToUint(data.addressRAMResult);
         int value = context.memManager.read(addr, context.process);
         auto req = std::make_unique<IORequest>();
         req->msg = std::to_string(value);
         req->process = &context.process;
         context.ioRequests.push_back(std::move(req));
-
-        // std::cout << "[PRINT-REQ] PRINT MEM addr=" << addr << " value=" << value
-        //           << " (pid=" << context.process.pid << ")\n";
 
         if (context.printLock) {
             context.process.state = State::Blocked;
@@ -424,15 +507,37 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
 
 void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
-    if (data.op == "SW") {
-        uint32_t addr = binaryStringToUint(data.addressRAMResult);
-        string name_rt = this->map.getRegisterName(binaryStringToUint(data.target_register));
-        int value = context.registers.readRegister(name_rt);
-        context.memManager.write(addr, value, context.process);
-
-        // std::cout << "[WRITE-BACK] SW addr=" << addr << " value=" << value
-        //           << " from reg " << name_rt << "\n";
+    if (!data.writesRegister || data.writeRegisterName.empty()) {
+        return;
     }
+
+    int32_t value = 0;
+    bool hasValue = false;
+
+    if (data.hasLoadResult) {
+        value = data.loadResult;
+        data.hasLoadResult = false;
+        hasValue = true;
+    } else if (data.hasAluResult) {
+        value = data.aluResult;
+        data.hasAluResult = false;
+        hasValue = true;
+    }
+
+    if (!hasValue) {
+        return;
+    }
+
+    context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
+    data.writesRegister = false;
+    data.writeRegisterName.clear();
+}
+
+void Control_Unit::FlushPipeline(ControlContext &context) {
+    data.clear();
+    context.counter = 0;
+    context.counterForEnd = 5;
+    context.endExecution = false;
 }
 
 // A função Core agora espera um ponteiro para o PCB, pois o PCB não é mais copiável

@@ -1,10 +1,10 @@
 === Resultados de Execução ===
-PID: 1
-Nome: processo_teste_1
-Quantum: 12
+PID: 3
+Nome: io_bound_sim
+Quantum: 47
 Prioridade: 0
-Ciclos de Pipeline: 30
-Ciclos de Memória: 405
-Cache Hits: 11
-Cache Misses: 122
+Ciclos de Pipeline: 26
+Ciclos de Memória: 372
+Cache Hits: 9
+Cache Misses: 48
 Ciclos de IO: 1

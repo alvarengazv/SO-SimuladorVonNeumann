@@ -20,8 +20,8 @@ a2    : 0x00000000  (Decimal: 0)
 a3    : 0x00000000  (Decimal: 0)
 ----------------------------------------
 t0    : 0x00000000  (Decimal: 0)
-t1    : 0xfffffffb  (Decimal: -5)
-t2    : 0xa0000000  (Decimal: 10)
+t1    : 0x00000000  (Decimal: 0)
+t2    : 0x00000000  (Decimal: 0)
 t3    : 0x00000000  (Decimal: 0)
 t4    : 0x00000000  (Decimal: 0)
 t5    : 0x00000000  (Decimal: 0)
@@ -49,7 +49,6 @@ k1    : 0x00000000  (Decimal: 0)
 
 
 === Operações Executadas ===
-[ARIT] SUB t1 = t0(0) SUB t1(5) = -5
-[ARIT] DIV zero = zero(0) DIV zero(0) = 0
+(Nenhuma operação registrada)
 
 === Fim das Operações Registradas ===

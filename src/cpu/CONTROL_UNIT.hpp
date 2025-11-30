@@ -31,6 +31,20 @@ struct Instruction_Data {
     string addressRAMResult;
     uint32_t rawInstruction = 0;
     int32_t immediate = 0;
+    std::string sourceRegisterName;
+    std::string targetRegisterName;
+    std::string destinationRegisterName;
+    std::string writeRegisterName;
+    bool writesRegister = false;
+    bool hasAluResult = false;
+    int32_t aluResult = 0;
+    bool pendingMemoryRead = false;
+    bool pendingMemoryWrite = false;
+    bool hasEffectiveAddress = false;
+    uint32_t effectiveAddress = 0;
+    int32_t loadResult = 0;
+    bool hasLoadResult = false;
+    int32_t storeValue = 0;
 };
 
 struct ControlContext {
@@ -69,14 +83,14 @@ struct Control_Unit {
     void Decode(hw::REGISTER_BANK &registers, Instruction_Data &data);
     void Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Instruction_Data &d);
     void Execute_Operation(Instruction_Data &data, ControlContext &context);
-    void Execute_Loop_Operation(hw::REGISTER_BANK &registers, Instruction_Data &d,
-                                int &counter, int &counterForEnd, bool &endProgram,
-                                MemoryManager &memManager, PCB &process);
+    void Execute_Loop_Operation(Instruction_Data &d, ControlContext &context);
     void Execute(Instruction_Data &data, ControlContext &context);
     void Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data);
     void log_operation(const std::string &msg);
     void Memory_Acess(Instruction_Data &data, ControlContext &context);
     void Write_Back(Instruction_Data &data, ControlContext &context);
+    void FlushPipeline(ControlContext &context);
+    std::string resolveRegisterName(const std::string &bits) const;
 };
 
 #endif // CONTROL_UNIT_HPP
