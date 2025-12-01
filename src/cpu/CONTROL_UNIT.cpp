@@ -15,10 +15,9 @@
 #include <vector>
 #include <fstream>
 #include <mutex>
-
-static std::mutex log_mutex;
-
-
+#include <atomic>
+#include <condition_variable>
+#include <thread>
 
 using namespace std;
 
@@ -34,6 +33,21 @@ void Control_Unit::log_operation(const std::string &msg) {
     oss << "output/temp_" << temp_file_id << ".log";
 
     std::ofstream fout(oss.str(), std::ios::app);
+    if (fout.is_open()) {
+        fout << msg << "\n";
+    }
+}
+
+static void log_forwarding_event(const std::string &msg) {
+    std::lock_guard<std::mutex> lock(log_mutex);
+
+    std::ios_base::openmode mode = std::ios::app;
+    if (!forwarding_log_initialized) {
+        mode = std::ios::trunc;
+        forwarding_log_initialized = true;
+    }
+
+    std::ofstream fout("output/forwarding_trace.log", mode);
     if (fout.is_open()) {
         fout << msg << "\n";
     }
@@ -89,6 +103,74 @@ std::string Control_Unit::resolveRegisterName(const std::string &bits) const {
     }
 }
 
+int Control_Unit::instructionIndex(const Instruction_Data &entry) const {
+    if (data.empty()) {
+        return -1;
+    }
+    const Instruction_Data *base = data.data();
+    return static_cast<int>(&entry - base);
+}
+
+bool Control_Unit::readRegisterWithForwarding(const std::string &name,
+                                              Instruction_Data &current,
+                                              ControlContext &context,
+                                              int32_t &value) {
+    if (name.empty()) {
+        value = 0;
+        return true;
+    }
+
+    value = static_cast<int32_t>(context.registers.readRegister(name));
+
+    // Registradores somente leitura (ex.: zero) não participam do mecanismo de forwarding.
+    if (map.isReadOnly(name)) {
+        return true;
+    }
+
+    int currentIdx = instructionIndex(current);
+    if (currentIdx <= 0) {
+        return true;
+    }
+
+    std::unique_lock<std::mutex> lock(forwardingMutex);
+
+    for (int idx = currentIdx - 1; idx >= 0; --idx) {
+        Instruction_Data &older = data[idx];
+        if (!older.writesRegister) {
+            continue;
+        }
+        if (older.writeRegisterName != name) {
+            continue;
+        }
+        auto ready = [&]() {
+            return older.hasLoadResult || older.hasAluResult || !older.writesRegister;
+        };
+
+        forwardingCv.wait(lock, ready);
+
+        if (older.hasLoadResult) {
+            value = older.loadResult;
+            std::ostringstream ss;
+            ss << "[FWD] reg=" << name << " <- LOAD op=" << older.op
+               << " idx=" << idx << " value=" << value;
+            log_forwarding_event(ss.str());
+            return true;
+        }
+        if (older.hasAluResult) {
+            value = older.aluResult;
+            std::ostringstream ss;
+            ss << "[FWD] reg=" << name << " <- ALU op=" << older.op
+               << " idx=" << idx << " value=" << value;
+            log_forwarding_event(ss.str());
+            return true;
+        }
+
+        return true;
+    }
+
+    return true;
+}
+
 string Control_Unit::Get_immediate(const uint32_t instruction) {
     uint16_t imm = static_cast<uint16_t>(instruction & 0xFFFFu);
     return std::bitset<16>(imm).to_string();
@@ -109,8 +191,7 @@ string Control_Unit::Get_source_Register(const uint32_t instruction) {
     return regIndexToBitString(rs);
 }
 
-string Control_Unit::Identificacao_instrucao(uint32_t instruction, hw::REGISTER_BANK &registers) {
-    (void)registers; // evita warning
+string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
     uint32_t opcode = (instruction >> 26) & 0x3Fu;
     std::string opcode_bin = toBinStr(opcode, 6);
 
@@ -153,34 +234,26 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction, hw::REGISTER_
     }
 }
 
-void Control_Unit::Fetch(ControlContext &context) {
+uint32_t Control_Unit::FetchInstruction(ControlContext &context) {
     account_stage(context.process);
-    // MAR <- PC
-    context.registers.mar.write(context.registers.pc.value);
-    // Read memory at MAR (endereçamento em bytes presunção: PC em bytes)
-    uint32_t instr = context.memManager.read(context.registers.mar.read(), context.process);
+    uint32_t pcValue = context.registers.pc.read();
+    context.registers.mar.write(pcValue);
+    uint32_t instr = context.memManager.read(pcValue, context.process);
     context.registers.ir.write(instr);
 
-    // === TRACE FETCH ===
-    // std::cout << "[FETCH] PC=" << context.registers.pc.value
-    //           << " MAR=" << context.registers.mar.read()
-    //           << " INSTR=0x" << std::hex << instr << std::dec
-    //           << " (" << toBinStr(instr, 32) << ")\n";
-
-    const uint32_t END_SENTINEL = 0b11111100000000000000000000000000u;
-    if (instr == END_SENTINEL) {
-        context.endProgram = true;
-        return;
+    if (instr != END_SENTINEL) {
+        context.registers.pc.write(pcValue + 4);
+    } else {
+        context.endProgram.store(true, std::memory_order_relaxed);
     }
-    // PC <- PC + 4 (endereçamento por byte)
-    context.registers.pc.write(context.registers.pc.value + 4);
+
+    return instr;
 }
 
-void Control_Unit::Decode(hw::REGISTER_BANK &registers, Instruction_Data &data) {
-    uint32_t instruction = registers.ir.read();
+void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
     data = Instruction_Data{};
     data.rawInstruction = instruction;
-    data.op = Identificacao_instrucao(instruction, registers);
+    data.op = Identificacao_instrucao(instruction);
 
     // R-type
     if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
@@ -217,41 +290,21 @@ void Control_Unit::Decode(hw::REGISTER_BANK &registers, Instruction_Data &data) 
             data.addressRAMResult.clear();
             data.immediate = 0;
         }
-
-        if (!data.source_register.empty()) {
-            data.sourceRegisterName = resolveRegisterName(data.source_register);
-        }
-        if (!data.target_register.empty()) {
-            data.targetRegisterName = resolveRegisterName(data.target_register);
-        }
-        if (!data.destination_register.empty()) {
-            data.destinationRegisterName = resolveRegisterName(data.destination_register);
-        }
     }
 
-    // === TRACE DECODE ===
-    // std::cout << "[DECODE] RAW=0x" << std::hex << data.rawInstruction << std::dec
-    //           << " OP=" << (data.op.empty() ? "<UNKNOWN>" : data.op) << "\n";
-    // if (!data.source_register.empty()) {
-    //     std::cout << "         rs(bits)=" << data.source_register
-    //               << " name=" << this->map.getRegisterName(binaryStringToUint(data.source_register)) << "\n";
-    // }
-    // if (!data.target_register.empty()) {
-    //     std::cout << "         rt(bits)=" << data.target_register
-    //               << " name=" << this->map.getRegisterName(binaryStringToUint(data.target_register)) << "\n";
-    // }
-    // if (!data.destination_register.empty()) {
-    //     std::cout << "         rd(bits)=" << data.destination_register
-    //               << " name=" << this->map.getRegisterName(binaryStringToUint(data.destination_register)) << "\n";
-    // }
-    // if (!data.addressRAMResult.empty()) {
-    //     std::cout << "         address/immediate(bits)=" << data.addressRAMResult
-    //               << " immediate(signed)=" << data.immediate << "\n";
-    // }
+    if (!data.source_register.empty()) {
+        data.sourceRegisterName = resolveRegisterName(data.source_register);
+    }
+    if (!data.target_register.empty()) {
+        data.targetRegisterName = resolveRegisterName(data.target_register);
+    }
+    if (!data.destination_register.empty()) {
+        data.destinationRegisterName = resolveRegisterName(data.destination_register);
+    }
 }
 
 
-void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data) {
+void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruction_Data &data) {
     std::string name_rs = data.sourceRegisterName;
     std::string name_rt = data.targetRegisterName;
 
@@ -259,7 +312,10 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
         return;
     }
 
-    int32_t val_rs = name_rs.empty() ? 0 : static_cast<int32_t>(registers.readRegister(name_rs));
+    int32_t val_rs = 0;
+    if (!readRegisterWithForwarding(name_rs, data, context, val_rs)) {
+        throw std::runtime_error("Hazard forwarding falhou para " + name_rs);
+    }
     int32_t imm = data.immediate; // já sign-extended
 
     std::ostringstream ss;
@@ -271,10 +327,14 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
         alu.B = imm;
         alu.op = ADD;
         alu.calculate();
-        data.writeRegisterName = name_rt;
-        data.writesRegister = true;
-        data.hasAluResult = true;
-        data.aluResult = alu.result;
+        {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
+            data.writeRegisterName = name_rt;
+            data.writesRegister = true;
+            data.hasAluResult = true;
+            data.aluResult = alu.result;
+        }
+        forwardingCv.notify_all();
 
         ss << "[IMM] " << data.op << " "
            << name_rt << " = " << name_rs << "(" << val_rs << ") + "
@@ -286,10 +346,14 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
     // SLTI
     if (data.op == "SLTI") {
         int32_t res = (val_rs < imm) ? 1 : 0;
-        data.writeRegisterName = name_rt;
-        data.writesRegister = true;
-        data.hasAluResult = true;
-        data.aluResult = res;
+        {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
+            data.writeRegisterName = name_rt;
+            data.writesRegister = true;
+            data.hasAluResult = true;
+            data.aluResult = res;
+        }
+        forwardingCv.notify_all();
 
         ss << "[IMM] SLTI " << name_rt << " = (" << name_rs << "(" << val_rs
            << ") < " << imm << ") ? 1 : 0 -> " << res;
@@ -301,10 +365,14 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
     if (data.op == "LUI") {
         uint32_t uimm = static_cast<uint32_t>(static_cast<uint16_t>(imm));
         int32_t val = static_cast<int32_t>(uimm << 16);
-        data.writeRegisterName = name_rt;
-        data.writesRegister = true;
-        data.hasAluResult = true;
-        data.aluResult = val;
+        {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
+            data.writeRegisterName = name_rt;
+            data.writesRegister = true;
+            data.hasAluResult = true;
+            data.aluResult = val;
+        }
+        forwardingCv.notify_all();
 
         ss << "[IMM] LUI " << name_rt << " = (0x" << std::hex << imm
            << " << 16) -> 0x" << val << std::dec;
@@ -314,10 +382,14 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
 
     // LI
     if (data.op == "LI") {
-        data.writeRegisterName = name_rt;
-        data.writesRegister = true;
-        data.hasAluResult = true;
-        data.aluResult = imm;
+        {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
+            data.writeRegisterName = name_rt;
+            data.writesRegister = true;
+            data.hasAluResult = true;
+            data.aluResult = imm;
+        }
+        forwardingCv.notify_all();
 
         ss << "[IMM] LI " << name_rt << " = " << imm;
         log_operation(ss.str());
@@ -330,7 +402,7 @@ void Control_Unit::Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Ins
     log_operation(ss.str());
 }
 
-void Control_Unit::Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data) {
+void Control_Unit::Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &data) {
     std::string name_rs = data.sourceRegisterName;
     std::string name_rt = data.targetRegisterName;
     std::string name_rd = data.destinationRegisterName;
@@ -339,8 +411,15 @@ void Control_Unit::Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Ins
         return;
     }
 
-    int32_t val_rs = registers.readRegister(name_rs);
-    int32_t val_rt = registers.readRegister(name_rt);
+    int32_t val_rs = 0;
+    if (!readRegisterWithForwarding(name_rs, data, context, val_rs)) {
+        throw std::runtime_error("Hazard forwarding falhou para " + name_rs);
+    }
+
+    int32_t val_rt = 0;
+    if (!readRegisterWithForwarding(name_rt, data, context, val_rt)) {
+        throw std::runtime_error("Hazard forwarding falhou para " + name_rt);
+    }
 
     ALU alu;
     alu.A = val_rs;
@@ -353,10 +432,14 @@ void Control_Unit::Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Ins
     else return;
 
     alu.calculate();
-    data.writeRegisterName = name_rd;
-    data.writesRegister = true;
-    data.hasAluResult = true;
-    data.aluResult = alu.result;
+    {
+        std::lock_guard<std::mutex> guard(forwardingMutex);
+        data.writeRegisterName = name_rd;
+        data.writesRegister = true;
+        data.hasAluResult = true;
+        data.aluResult = alu.result;
+    }
+    forwardingCv.notify_all();
 
     std::ostringstream ss;
     ss << "[ARIT] " << data.op << " " << name_rd
@@ -370,19 +453,26 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
     if (data.op == "PRINT") {
         if (!data.target_register.empty()) {
             string name = this->map.getRegisterName(binaryStringToUint(data.target_register));
-            int value = context.registers.readRegister(name);
+            int32_t value = 0;
+            if (!readRegisterWithForwarding(name, data, context, value)) {
+                throw std::runtime_error("Hazard forwarding falhou para " + name);
+            }
             auto req = std::make_unique<IORequest>();
             req->msg = std::to_string(value);
             req->process = &context.process;
-            context.ioRequests.push_back(std::move(req));
+            context.process.appendProgramOutput(req->msg);
+            {
+                std::lock_guard<std::mutex> queueLock(io_mutex);
+                context.ioRequests.push_back(std::move(req));
+            }
 
             // TRACE PRINT from register
             std::cout << "[PRINT-REQ] PRINT REG " << name << " value=" << value
                       << " (pid=" << context.process.pid << ")\n";
 
-            if (context.printLock) {
-                context.process.state = State::Blocked;
-                context.endExecution = true;
+            if (context.printLock.load(std::memory_order_relaxed)) {
+                context.process.state.store(State::Blocked);
+                context.endExecution.store(true);
             }
         }
     }
@@ -396,9 +486,19 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
         return;
     }
 
+    int32_t operandA = 0;
+    if (!readRegisterWithForwarding(name_rs, data, context, operandA)) {
+        throw std::runtime_error("Hazard forwarding falhou para " + name_rs);
+    }
+
+    int32_t operandB = 0;
+    if (!name_rt.empty() && !readRegisterWithForwarding(name_rt, data, context, operandB)) {
+            throw std::runtime_error("Hazard forwarding falhou para " + name_rt);
+    }
+
     ALU alu;
-    alu.A = context.registers.readRegister(name_rs);
-    alu.B = name_rt.empty() ? 0 : context.registers.readRegister(name_rt);
+    alu.A = operandA;
+    alu.B = operandB;
 
     bool jump = false;
     if (data.op == "BEQ") { alu.op = BEQ; alu.calculate(); jump = (alu.result == 1); }
@@ -411,7 +511,7 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
         uint32_t addr = binaryStringToUint(data.addressRAMResult);
         context.registers.pc.write(addr);
         FlushPipeline(context);
-        context.endProgram = false;
+        context.endProgram.store(false, std::memory_order_relaxed);
     }
 }
 
@@ -434,6 +534,7 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
 
     if (data.op == "LW") {
         if (assignAddress() && !data.targetRegisterName.empty()) {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
             data.pendingMemoryRead = true;
             data.writeRegisterName = data.targetRegisterName;
             data.writesRegister = true;
@@ -444,17 +545,23 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     if (data.op == "SW") {
         if (assignAddress() && !data.targetRegisterName.empty()) {
             data.pendingMemoryWrite = true;
-            data.storeValue = static_cast<int32_t>(context.registers.readRegister(data.targetRegisterName));
+            if (!readRegisterWithForwarding(data.targetRegisterName, data, context, data.storeValue)) {
+                throw std::runtime_error("Hazard forwarding falhou para " + data.targetRegisterName);
+            }
         }
         return;
     }
 
     if (data.op == "LA") {
         if (assignAddress() && !data.targetRegisterName.empty()) {
-            data.writeRegisterName = data.targetRegisterName;
-            data.writesRegister = true;
-            data.hasAluResult = true;
-            data.aluResult = static_cast<int32_t>(data.effectiveAddress);
+            {
+                std::lock_guard<std::mutex> guard(forwardingMutex);
+                data.writeRegisterName = data.targetRegisterName;
+                data.writesRegister = true;
+                data.hasAluResult = true;
+                data.aluResult = static_cast<int32_t>(data.effectiveAddress);
+            }
+            forwardingCv.notify_all();
         }
         return;
     }
@@ -462,13 +569,13 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     // Immediates / I-type arithmetic
     if (data.op == "ADDI" || data.op == "ADDIU" || data.op == "SLTI" || data.op == "LUI" ||
         data.op == "LI") {
-        Execute_Immediate_Operation(context.registers, data);
+        Execute_Immediate_Operation(context, data);
         return;
     }
 
     // R-type
     if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
-        Execute_Aritmetic_Operation(context.registers, data);
+        Execute_Aritmetic_Operation(context, data);
     } else if (data.op == "BEQ" || data.op == "J" || data.op == "BNE" || data.op == "BGT" || data.op == "BGTI" || data.op == "BLT" || data.op == "BLTI") {
         Execute_Loop_Operation(data, context);
     } else if (data.op == "PRINT") {
@@ -478,11 +585,16 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
 
 void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
+
     if (data.pendingMemoryRead && data.hasEffectiveAddress) {
         int value = context.memManager.read(data.effectiveAddress, context.process);
-        data.loadResult = value;
-        data.hasLoadResult = true;
-        data.pendingMemoryRead = false;
+        {
+            std::lock_guard<std::mutex> guard(forwardingMutex);
+            data.loadResult = value;
+            data.hasLoadResult = true;
+            data.pendingMemoryRead = false;
+        }
+        forwardingCv.notify_all();
     }
 
     if (data.pendingMemoryWrite && data.hasEffectiveAddress) {
@@ -496,11 +608,15 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
         auto req = std::make_unique<IORequest>();
         req->msg = std::to_string(value);
         req->process = &context.process;
-        context.ioRequests.push_back(std::move(req));
+        context.process.appendProgramOutput(req->msg);
+        {
+            std::lock_guard<std::mutex> queueLock(io_mutex);
+            context.ioRequests.push_back(std::move(req));
+        }
 
-        if (context.printLock) {
-            context.process.state = State::Blocked;
-            context.endExecution = true;
+        if (context.printLock.load(std::memory_order_relaxed)) {
+            context.process.state.store(State::Blocked);
+            context.endExecution.store(true);
         }
     }
 }
@@ -516,11 +632,9 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
 
     if (data.hasLoadResult) {
         value = data.loadResult;
-        data.hasLoadResult = false;
         hasValue = true;
     } else if (data.hasAluResult) {
         value = data.aluResult;
-        data.hasAluResult = false;
         hasValue = true;
     }
 
@@ -529,69 +643,166 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     }
 
     context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
-    data.writesRegister = false;
-    data.writeRegisterName.clear();
+    {
+        std::lock_guard<std::mutex> guard(forwardingMutex);
+        data.writesRegister = false;
+        data.writeRegisterName.clear();
+        data.hasLoadResult = false;
+        data.hasAluResult = false;
+    }
+    forwardingCv.notify_all();
 }
 
 void Control_Unit::FlushPipeline(ControlContext &context) {
-    data.clear();
-    context.counter = 0;
-    context.counterForEnd = 5;
-    context.endExecution = false;
+    if (context.flushPipeline) {
+        context.flushPipeline();
+    }
 }
 
-// A função Core agora espera um ponteiro para o PCB, pois o PCB não é mais copiável
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, bool &printLock) {
+// A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
+void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock) {
     Control_Unit UC;
-    Instruction_Data data;
-    int clock = 0;
-    int counterForEnd = 5;
-    int counter = 0;
-    bool endProgram = false;
-    bool endExecution = false;
+    const size_t reserveSize = std::max<size_t>(process.instructions + 8, 256);
+    UC.data.reserve(reserveSize);
 
-    ControlContext context{ process.regBank, memoryManager, *ioRequests, printLock, process, counter, counterForEnd, endProgram, endExecution };
+    std::atomic<bool> endProgram{false};
+    std::atomic<bool> endExecution{false};
 
-    while (context.counterForEnd > 0) {
-        if (context.counter >= 4 && context.counterForEnd >= 1) {
-            UC.Write_Back(UC.data[context.counter - 4], context);
-        }
-        if (context.counter >= 3 && context.counterForEnd >= 2) {
-            UC.Memory_Acess(UC.data[context.counter - 3], context);
-        }
-        if (context.counter >= 2 && context.counterForEnd >= 3) {
-            UC.Execute(UC.data[context.counter - 2], context);
-        }
-        if (context.counter >= 1 && context.counterForEnd >= 4) {
-            account_stage(process);
-            UC.Decode(context.registers, UC.data[context.counter - 1]);
-        }
-        if (context.counter >= 0 && context.counterForEnd == 5) {
-            UC.data.push_back(data);
-            UC.Fetch(context);
+    ControlContext context{ process.regBank, memoryManager, *ioRequests, printLock, process, endProgram, endExecution };
+
+    PipelineRegister ifId;
+    PipelineRegister idEx;
+    PipelineRegister exMem;
+    PipelineRegister memWb;
+
+    context.flushPipeline = [&]() {
+        ifId.flush();
+        idEx.flush();
+    };
+
+    std::atomic<int> issuedCycles{0};
+
+    auto makeDrainToken = [&](bool programEndedFlag) {
+        PipelineToken drain;
+        drain.terminate = true;
+        drain.programEnded = programEndedFlag;
+        return drain;
+    };
+
+    std::thread fetchThread([&]() {
+        bool drainSent = false;
+        while (true) {
+            if (endExecution.load(std::memory_order_relaxed)) {
+                break;
+            }
+
+            uint32_t instruction = UC.FetchInstruction(context);
+            if (context.endProgram.load(std::memory_order_relaxed)) {
+                drainSent = true;
+                ifId.push(makeDrainToken(true));
+                break;
+            }
+
+            PipelineToken token;
+            token.entry = &UC.data.emplace_back();
+            token.valid = true;
+            token.instruction = instruction;
+            ifId.push(token);
+
+            issuedCycles.fetch_add(1, std::memory_order_relaxed);
+            account_pipeline_cycle(process);
+
+            if (issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
+                endExecution.store(true, std::memory_order_relaxed);
+                break;
+            }
         }
 
-        context.counter += 1;
-        clock += 1;
-        account_pipeline_cycle(process);
-
-        if (clock >= process.quantum || context.endProgram == true) {
-            context.endExecution = true;
+        if (!drainSent) {
+            bool programEndedFlag = context.endProgram.load(std::memory_order_relaxed);
+            ifId.push(makeDrainToken(programEndedFlag));
         }
-        if (context.endExecution == true) {
-            context.counterForEnd -= 1;
-        }
-    }
-    //Incrementa o timeStamp do processo a quantidade de clocks que ele executou
-    process.timeStamp+=clock;
+    });
 
-    if (context.endProgram) {
-        process.state = State::Finished;
+    std::thread decodeThread([&]() {
+        PipelineToken token;
+        while (ifId.pop(token)) {
+            if (token.terminate) {
+                idEx.push(token);
+                break;
+            }
+            if (!token.valid) {
+                continue;
+            }
+            account_stage(context.process);
+            UC.Decode(token.instruction, *token.entry);
+            token.instruction = 0;
+            idEx.push(token);
+        }
+    });
+
+    std::thread executeThread([&]() {
+        PipelineToken token;
+        while (idEx.pop(token)) {
+            if (token.terminate) {
+                exMem.push(token);
+                break;
+            }
+            if (!token.valid) {
+                continue;
+            }
+            UC.Execute(*token.entry, context);
+            exMem.push(token);
+        }
+    });
+
+    std::thread memoryThread([&]() {
+        PipelineToken token;
+        while (exMem.pop(token)) {
+            if (token.terminate) {
+                memWb.push(token);
+                break;
+            }
+            if (!token.valid) {
+                continue;
+            }
+            UC.Memory_Acess(*token.entry, context);
+            memWb.push(token);
+        }
+    });
+
+    std::thread writeThread([&]() {
+        PipelineToken token;
+        while (memWb.pop(token)) {
+            if (token.terminate) {
+                if (token.programEnded) {
+                    context.endProgram.store(true, std::memory_order_relaxed);
+                }
+                break;
+            }
+            if (!token.valid) {
+                continue;
+            }
+            UC.Write_Back(*token.entry, context);
+        }
+    });
+
+    fetchThread.join();
+    decodeThread.join();
+    executeThread.join();
+    memoryThread.join();
+    writeThread.join();
+
+    process.timeStamp += issuedCycles.load(std::memory_order_relaxed);
+
+    if (context.endProgram.load(std::memory_order_relaxed)) {
+        process.state.store(State::Finished);
+    } else if (process.state.load() != State::Blocked) {
+        process.state.store(State::Ready);
     }
 
     // === DUMP FINAL DOS REGISTRADORES ===
     {
-        // nomes comuns de registradores MIPS como fallback
         const vector<string> fallback_names = {
             "zero","at","v0","v1","a0","a1","a2","a3",
             "t0","t1","t2","t3","t4","t5","t6","t7",
@@ -599,33 +810,17 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             "t8","t9","k0","k1","gp","sp","fp","ra"
         };
 
-        
-        // Primeiro tentamos usar um mapper global se existir; caso contrário, usamos os nomes de fallback
-        bool printed = false;
         try {
-            // Se sua infra tem um mapper global com getRegisterName(uint32_t), descomente a linha abaixo:
-            // auto &mapper = hw::getGlobalRegisterMapper();
-            // for (uint32_t i = 0; i < 32; ++i) {
-            //     std::string name = mapper.getRegisterName(i);
-            //     int val = context.registers.readRegister(name);
-            //     std::cout << name << " (" << i << ") = " << val << "\n";
-            // }
-            // printed = true;
-
-            // Se não tiver mapper global, usamos nomes de fallback:
             for (uint32_t i = 0; i < 32; ++i) {
                 string name;
                 if (i < fallback_names.size()) name = fallback_names[i];
                 else name = "r" + to_string(i);
-                int val = context.registers.readRegister(name);
-             }
-            printed = true;
+                (void)context.registers.readRegister(name);
+            }
         } catch (...) {
-            // caso algo dê errado ao ler por nome, apenas tentamos imprimir PC/IR
-            printed = false;
+            // Ignora erros durante o dump
         }
 
-        // PC e IR
         std::cout << "PC = " << context.registers.pc.read() << "\n";
         std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
                   << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";

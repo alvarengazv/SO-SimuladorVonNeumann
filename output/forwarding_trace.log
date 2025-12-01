@@ -1,0 +1,14 @@
+[FWD] reg=s1 <- LOAD op=LW idx=35 value=25
+[FWD] reg=s2 <- ALU op=ADD idx=36 value=40
+[FWD] reg=s3 <- LOAD op=LW idx=38 value=5
+[FWD] reg=s3 <- LOAD op=LW idx=38 value=5
+[FWD] reg=t8 <- LOAD op=LW idx=41 value=10
+[FWD] reg=t0 <- LOAD op=LW idx=2 value=20
+[FWD] reg=t1 <- LOAD op=LW idx=13 value=5
+[FWD] reg=t2 <- LOAD op=LW idx=15 value=10
+[FWD] reg=t2 <- LOAD op=LW idx=15 value=10
+[FWD] reg=t0 <- LOAD op=LW idx=6 value=3
+[FWD] reg=t2 <- ALU op=ADD idx=8 value=0
+[FWD] reg=t3 <- ALU op=ADD idx=9 value=0
+[FWD] reg=t4 <- LOAD op=LW idx=12 value=3
+[FWD] reg=t5 <- ALU op=ADD idx=13 value=3
