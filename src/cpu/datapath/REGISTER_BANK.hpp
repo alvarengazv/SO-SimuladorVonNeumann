@@ -30,6 +30,7 @@ faz e quais funções ela tem.
 #include <stdexcept>
 #include <iostream>
 #include <iomanip>
+#include <shared_mutex>
 
 
 using namespace std;
@@ -55,6 +56,7 @@ namespace hw{
         // --- Mapas de acesso por nome (a interface principal para a Control_Unit) ---
         unordered_map<string, function<uint32_t()>> acessoLeituraRegistradores;
         unordered_map<string, function<void(uint32_t)>> acessoEscritaRegistradores;
+        mutable std::shared_mutex bankMutex;
 
         // Construtor: Declarado aqui, implementado no .cpp
         REGISTER_BANK();

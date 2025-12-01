@@ -15,6 +15,8 @@ nome for inválido.
 */
 
 #include "REGISTER_BANK.hpp" 
+#include <shared_mutex>
+#include <mutex>
 
 namespace hw{
 
@@ -72,6 +74,7 @@ REGISTER_BANK::REGISTER_BANK(){
 }
 
 uint32_t REGISTER_BANK::readRegister(const string &name) const{
+    std::shared_lock<std::shared_mutex> lock(bankMutex);
     auto it = acessoLeituraRegistradores.find(name);
 
     if (it == acessoLeituraRegistradores.end()){
@@ -82,6 +85,7 @@ uint32_t REGISTER_BANK::readRegister(const string &name) const{
 }
 
 void REGISTER_BANK::writeRegister(const string &name, uint32_t value){
+    std::unique_lock<std::shared_mutex> lock(bankMutex);
     auto it = acessoEscritaRegistradores.find(name);
 
     if (it == acessoEscritaRegistradores.end()){
@@ -92,12 +96,14 @@ void REGISTER_BANK::writeRegister(const string &name, uint32_t value){
 }
 
 void REGISTER_BANK::reset(){
+    std::unique_lock<std::shared_mutex> lock(bankMutex);
     for (auto const& [name, func] : acessoEscritaRegistradores){
         func(0);
     }
 }
 
 void REGISTER_BANK::print_registers() const{
+    std::shared_lock<std::shared_mutex> lock(bankMutex);
     auto printPair = [](const string &name, uint32_t value){
         cout << left << setw(6) << name << ": 0x"
              << hex << setw(8) << setfill('0') << value
@@ -133,6 +139,7 @@ void REGISTER_BANK::print_registers() const{
     cout << "========================================\n";
 }
 string REGISTER_BANK::get_registers_as_string() const {
+    std::shared_lock<std::shared_mutex> lock(bankMutex);
     std::ostringstream ss;
     auto printPair = [&ss](const std::string &name, uint32_t value){
         ss << std::left << std::setw(6) << name << ": 0x"

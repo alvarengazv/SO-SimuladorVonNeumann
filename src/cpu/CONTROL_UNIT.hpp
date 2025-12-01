@@ -10,18 +10,26 @@
 #include <vector>
 #include <cstdint>
 #include <memory>
+#include <atomic>
+#include <functional>
+#include <mutex>
+#include <condition_variable>
 
 using std::string;
 using std::vector;
 using std::uint32_t;
 using std::unique_ptr;
+static std::mutex log_mutex;
+static std::mutex io_mutex;
+static bool forwarding_log_initialized = false;
+static constexpr uint32_t END_SENTINEL = 0b11111100000000000000000000000000u;
 
 // Forward declarations
 class MemoryManager;
 struct PCB;
 struct IORequest;
 
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, bool &printLock);
+void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock);
 
 struct Instruction_Data {
     string source_register;
@@ -51,12 +59,11 @@ struct ControlContext {
     hw::REGISTER_BANK &registers;
     MemoryManager &memManager;
     vector<unique_ptr<IORequest>> &ioRequests;
-    bool &printLock;
+    std::atomic<bool> &printLock;
     PCB &process;
-    int &counter;
-    int &counterForEnd;
-    bool &endProgram;
-    bool &endExecution;
+    std::atomic<bool> &endProgram;
+    std::atomic<bool> &endExecution;
+    std::function<void()> flushPipeline;
 };
 
 struct Control_Unit {
@@ -77,20 +84,88 @@ struct Control_Unit {
     static string Get_source_Register(uint32_t instruction);
 
     // Assinatura corrigida para corresponder à implementação
-    string Identificacao_instrucao(uint32_t instruction, hw::REGISTER_BANK &registers);
+    string Identificacao_instrucao(uint32_t instruction);
 
-    void Fetch(ControlContext &context);
-    void Decode(hw::REGISTER_BANK &registers, Instruction_Data &data);
-    void Execute_Aritmetic_Operation(hw::REGISTER_BANK &registers, Instruction_Data &d);
+    uint32_t FetchInstruction(ControlContext &context);
+    void Decode(uint32_t instruction, Instruction_Data &data);
+    void Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &d);
     void Execute_Operation(Instruction_Data &data, ControlContext &context);
     void Execute_Loop_Operation(Instruction_Data &d, ControlContext &context);
     void Execute(Instruction_Data &data, ControlContext &context);
-    void Execute_Immediate_Operation(hw::REGISTER_BANK &registers, Instruction_Data &data);
+    void Execute_Immediate_Operation(ControlContext &context, Instruction_Data &data);
     void log_operation(const std::string &msg);
     void Memory_Acess(Instruction_Data &data, ControlContext &context);
     void Write_Back(Instruction_Data &data, ControlContext &context);
     void FlushPipeline(ControlContext &context);
     std::string resolveRegisterName(const std::string &bits) const;
+    bool readRegisterWithForwarding(const std::string &name,
+                                    Instruction_Data &current,
+                                    ControlContext &context,
+                                    int32_t &value);
+    int instructionIndex(const Instruction_Data &entry) const;
+    std::mutex forwardingMutex;
+    std::condition_variable forwardingCv;
+};
+
+struct PipelineToken {
+    Instruction_Data *entry = nullptr;
+    uint32_t instruction = 0;
+    bool valid = false;
+    bool terminate = false;
+    bool programEnded = false;
+};
+
+class PipelineRegister {
+public:
+    void push(const PipelineToken &token) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [&]() { return !hasToken_ || stopped_; });
+        if (stopped_) {
+            return;
+        }
+        stored_ = token;
+        hasToken_ = true;
+        cv_.notify_all();
+    }
+
+    bool pop(PipelineToken &out) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [&]() { return hasToken_ || stopped_; });
+        if (!hasToken_) {
+            return false;
+        }
+        out = stored_;
+        hasToken_ = false;
+        cv_.notify_all();
+        return true;
+    }
+
+    void flush() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        hasToken_ = false;
+        stored_ = PipelineToken{};
+        cv_.notify_all();
+    }
+
+    void stop() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        stopped_ = true;
+        hasToken_ = false;
+        stored_ = PipelineToken{};
+        cv_.notify_all();
+    }
+
+    bool empty() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return !hasToken_;
+    }
+
+private:
+    mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    PipelineToken stored_{};
+    bool hasToken_ = false;
+    bool stopped_ = false;
 };
 
 #endif // CONTROL_UNIT_HPP

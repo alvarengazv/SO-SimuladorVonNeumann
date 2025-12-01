@@ -11,15 +11,16 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize) 
 }
 
 uint32_t MemoryManager::read(uint32_t address, PCB& process) {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     process.mem_accesses_total.fetch_add(1);
     process.mem_reads.fetch_add(1);
 
     // 1. Tenta ler da Cache
     size_t cache_data = L1_cache->get(address);
-    if (cache_data != CACHE_MISS) {
-        process.cache_mem_accesses.fetch_add(1);
-        process.memory_cycles.fetch_add(process.memWeights.cache);
+    process.cache_mem_accesses.fetch_add(1);
+    process.memory_cycles.fetch_add(process.memWeights.cache);
 
+    if (cache_data != CACHE_MISS) {
         contabiliza_cache(process, true);  // HIT
         return cache_data;
     }
@@ -46,6 +47,7 @@ uint32_t MemoryManager::read(uint32_t address, PCB& process) {
 }
 
 void MemoryManager::write(uint32_t address, uint32_t data, PCB& process) {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     process.mem_accesses_total.fetch_add(1);
     process.mem_writes.fetch_add(1);
 
@@ -53,7 +55,7 @@ void MemoryManager::write(uint32_t address, uint32_t data, PCB& process) {
 
     if (cache_data == CACHE_MISS) {
         contabiliza_cache(process, false); // MISS
-        read(address, process); // Write-allocate: busca e coloca na cache
+        L1_cache->put(address, data, this);
     } else {
         contabiliza_cache(process, true);  // HIT
     }
@@ -89,6 +91,7 @@ void MemoryManager::setCacheReplacementPolicy(int policyCode) {
 
 // Função chamada pela cache para escrever dados "sujos" de volta na memória
 void MemoryManager::writeToFile(uint32_t address, uint32_t data) {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     if (address < mainMemoryLimit) {
         mainMemory->WriteMem(address, data);
     } else {

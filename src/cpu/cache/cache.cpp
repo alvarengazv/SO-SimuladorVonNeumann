@@ -20,6 +20,7 @@ Cache::~Cache() {
 }
 
 size_t Cache::get(size_t address) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     auto entryIt = cacheMap.find(address);
     if (entryIt != cacheMap.end() && entryIt->second.isValid) {
         cache_hits++;
@@ -40,6 +41,7 @@ size_t Cache::get(size_t address) {
 }
 
 void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     auto existingIt = cacheMap.find(address);
     if (existingIt != cacheMap.end()) {
         existingIt->second.data = data;
@@ -99,6 +101,7 @@ void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
 }
 
 void Cache::update(size_t address, size_t data) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     // Se o item não está na cache, primeiro o colocamos lá
     if (cacheMap.find(address) == cacheMap.end()) {
         // Para a simplicidade, assumimos que o `put` deve ser chamado pelo `MemoryManager`
@@ -122,6 +125,7 @@ void Cache::update(size_t address, size_t data) {
 }
 
 void Cache::invalidate() {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     for (auto &c : cacheMap) {
         c.second.isValid = false;
     }
@@ -133,6 +137,7 @@ void Cache::invalidate() {
 }
 
 std::vector<std::pair<size_t, size_t>> Cache::dirtyData() {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     std::vector<std::pair<size_t, size_t>> dirty_data;
     for (const auto &c : cacheMap) {
         if (c.second.isDirty) {

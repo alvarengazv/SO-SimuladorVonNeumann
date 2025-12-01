@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <stdexcept>
+#include <mutex>
 #include "../memory/MAIN_MEMORY.hpp"
 #include "../memory/SECONDARY_MEMORY.hpp"
 #include "cache/cache.hpp" // Incluir a cache
@@ -29,6 +30,7 @@ private:
     std::unique_ptr<Cache> L1_cache; // Adiciona a Cache L1
 
     size_t mainMemoryLimit;
+    mutable std::recursive_mutex memoryMutex;
 };
 
 #endif // MEMORY_MANAGER_HPP

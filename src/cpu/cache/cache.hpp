@@ -7,6 +7,8 @@
 #include <queue>
 #include <unordered_map>
 #include <vector>
+#include <queue> // Adicionado para FIFO
+#include <mutex>
 
 #define CACHE_CAPACITY 16
 #define CACHE_MISS UINT32_MAX
@@ -36,6 +38,7 @@ private:
     size_t capacity;
     int cache_misses;
     int cache_hits;
+    mutable std::mutex cacheMutex;
 
 public:
     Cache();
