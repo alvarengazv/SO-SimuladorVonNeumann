@@ -103,14 +103,6 @@ std::string Control_Unit::resolveRegisterName(const std::string &bits) const {
     }
 }
 
-int Control_Unit::instructionIndex(const Instruction_Data &entry) const {
-    if (data.empty()) {
-        return -1;
-    }
-    const Instruction_Data *base = data.data();
-    return static_cast<int>(&entry - base);
-}
-
 bool Control_Unit::readRegisterWithForwarding(const std::string &name,
                                               Instruction_Data &current,
                                               ControlContext &context,
@@ -120,52 +112,35 @@ bool Control_Unit::readRegisterWithForwarding(const std::string &name,
         return true;
     }
 
-    value = static_cast<int32_t>(context.registers.readRegister(name));
+    int32_t regValue = static_cast<int32_t>(context.registers.readRegister(name));
+    value = regValue;
 
     // Registradores somente leitura (ex.: zero) não participam do mecanismo de forwarding.
     if (map.isReadOnly(name)) {
         return true;
     }
 
-    int currentIdx = instructionIndex(current);
-    if (currentIdx <= 0) {
-        return true;
+    std::string sourceLabel;
+    {
+        std::lock_guard<std::mutex> guard(forwardingMutex);
+        auto exIt = exMemFwd.find(name);
+        if (exIt != exMemFwd.end()) {
+            value = exIt->second;
+            sourceLabel = "ALU";
+        } else {
+            auto memIt = memWbFwd.find(name);
+            if (memIt != memWbFwd.end()) {
+                value = memIt->second;
+                sourceLabel = "LOAD";
+            }
+        }
     }
 
-    std::unique_lock<std::mutex> lock(forwardingMutex);
-
-    for (int idx = currentIdx - 1; idx >= 0; --idx) {
-        Instruction_Data &older = data[idx];
-        if (!older.writesRegister) {
-            continue;
-        }
-        if (older.writeRegisterName != name) {
-            continue;
-        }
-        auto ready = [&]() {
-            return older.hasLoadResult || older.hasAluResult || !older.writesRegister;
-        };
-
-        forwardingCv.wait(lock, ready);
-
-        if (older.hasLoadResult) {
-            value = older.loadResult;
-            std::ostringstream ss;
-            ss << "[FWD] reg=" << name << " <- LOAD op=" << older.op
-               << " idx=" << idx << " value=" << value;
-            log_forwarding_event(ss.str());
-            return true;
-        }
-        if (older.hasAluResult) {
-            value = older.aluResult;
-            std::ostringstream ss;
-            ss << "[FWD] reg=" << name << " <- ALU op=" << older.op
-               << " idx=" << idx << " value=" << value;
-            log_forwarding_event(ss.str());
-            return true;
-        }
-
-        return true;
+    if (!sourceLabel.empty()) {
+        std::ostringstream ss;
+        ss << "[FWD] reg=" << name << " <- " << sourceLabel
+           << " value=" << value;
+        log_forwarding_event(ss.str());
     }
 
     return true;
@@ -301,6 +276,23 @@ void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
     if (!data.destination_register.empty()) {
         data.destinationRegisterName = resolveRegisterName(data.destination_register);
     }
+
+    auto setWriteIntent = [&](const std::string &regName) {
+        if (regName.empty()) {
+            return;
+        }
+        std::lock_guard<std::mutex> guard(forwardingMutex);
+        data.writeRegisterName = regName;
+        data.writesRegister = true;
+    };
+
+    if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
+        setWriteIntent(data.destinationRegisterName);
+    } else if (data.op == "ADDI" || data.op == "ADDIU" || data.op == "SLTI" ||
+               data.op == "LUI" || data.op == "LI" || data.op == "LW" ||
+               data.op == "LA") {
+        setWriteIntent(data.targetRegisterName);
+    }
 }
 
 
@@ -333,6 +325,7 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
             data.writesRegister = true;
             data.hasAluResult = true;
             data.aluResult = alu.result;
+            exMemFwd[name_rt] = alu.result;
         }
         forwardingCv.notify_all();
 
@@ -352,6 +345,7 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
             data.writesRegister = true;
             data.hasAluResult = true;
             data.aluResult = res;
+            exMemFwd[name_rt] = res;
         }
         forwardingCv.notify_all();
 
@@ -371,6 +365,7 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
             data.writesRegister = true;
             data.hasAluResult = true;
             data.aluResult = val;
+            exMemFwd[name_rt] = val;
         }
         forwardingCv.notify_all();
 
@@ -388,6 +383,7 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
             data.writesRegister = true;
             data.hasAluResult = true;
             data.aluResult = imm;
+            exMemFwd[name_rt] = imm;
         }
         forwardingCv.notify_all();
 
@@ -438,6 +434,7 @@ void Control_Unit::Execute_Aritmetic_Operation(ControlContext &context, Instruct
         data.writesRegister = true;
         data.hasAluResult = true;
         data.aluResult = alu.result;
+        exMemFwd[name_rt] = alu.result;
     }
     forwardingCv.notify_all();
 
@@ -593,6 +590,7 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
             data.loadResult = value;
             data.hasLoadResult = true;
             data.pendingMemoryRead = false;
+            memWbFwd[data.writeRegisterName] = value;
         }
         forwardingCv.notify_all();
     }
@@ -645,6 +643,8 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
     {
         std::lock_guard<std::mutex> guard(forwardingMutex);
+        exMemFwd.erase(data.writeRegisterName);
+        memWbFwd.erase(data.writeRegisterName);
         data.writesRegister = false;
         data.writeRegisterName.clear();
         data.hasLoadResult = false;
@@ -662,8 +662,6 @@ void Control_Unit::FlushPipeline(ControlContext &context) {
 // A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
 void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock) {
     Control_Unit UC;
-    const size_t reserveSize = std::max<size_t>(process.instructions + 8, 256);
-    UC.data.reserve(reserveSize);
 
     std::atomic<bool> endProgram{false};
     std::atomic<bool> endExecution{false};
