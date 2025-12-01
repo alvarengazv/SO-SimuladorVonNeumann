@@ -1,0 +1,10 @@
+{
+  "pid": 4,
+  "name": "hazard_forwarding",
+  "quantum": 0,
+  "priority": 0,
+  "mem_weights": {
+    "primary": 5,
+    "secondary": 20
+  }
+}

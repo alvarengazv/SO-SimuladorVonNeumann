@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <thread>
+#include <atomic>
 
 #include "../cpu/CONTROL_UNIT.hpp"
 #include "../cpu/pcb_loader.hpp"
@@ -71,19 +73,21 @@ bool Simulator::loadProcesses() {
         std::string pcbFile;
         std::string taskLabel;
         std::string taskFile;
+        uint32_t baseAddress;
     };
 
     const std::vector<ProcessDefinition> definitions = {
-        {"src/pcbs/process1.json", "tasks.json", "src/tasks/tasks.json"},
-        {"src/pcbs/process2.json", "tasks_counter.json", "src/tasks/tasks_counter.json"},
-        {"src/pcbs/process3.json", "tasks_io.json", "src/tasks/tasks_io.json"}};
+        {"src/pcbs/process1.json", "tasks.json", "src/tasks/tasks.json", 0x00000000},
+        {"src/pcbs/process2.json", "tasks_counter.json", "src/tasks/tasks_counter.json", 0x00000100},
+        {"src/pcbs/process3.json", "tasks_io.json", "src/tasks/tasks_io.json", 0x00000200},
+        {"src/pcbs/process_forward.json", "tasks_forward.json", "src/tasks/tasks_forward.json", 0x00000300}};
 
     bool allLoaded = true;
     for (const auto &definition : definitions) {
         allLoaded &= loadProcessDefinition(definition.pcbFile,
-                                           definition.taskLabel,
-                                           definition.taskFile,
-                                           0);
+                           definition.taskLabel,
+                           definition.taskFile,
+                           definition.baseAddress);
     }
     return allLoaded;
 }
@@ -102,6 +106,8 @@ bool Simulator::loadProcessDefinition(const std::string &pcbFile,
     std::cout << "Carregando programa '" << taskLabel << "' para o processo " << process->pid << "...\n";
     loadJsonProgram(taskFile, memManager, *process, baseAddress);
 
+    process->regBank.pc.write(baseAddress);
+
     readyQueue.push_back(process.get());
     processList.push_back(std::move(process));
     return true;
@@ -109,7 +115,7 @@ bool Simulator::loadProcessDefinition(const std::string &pcbFile,
 
 void Simulator::moveUnblockedProcesses() {
     for (auto it = blockedQueue.begin(); it != blockedQueue.end();) {
-        if ((*it)->state == State::Ready) {
+        if ((*it)->state.load() == State::Ready) {
             std::cout << "[Scheduler] Processo " << (*it)->pid
                       << " desbloqueado e movido para a fila de prontos.\n";
             readyQueue.push_back(*it);
@@ -125,14 +131,14 @@ void Simulator::executeProcess(PCB &process, int &finishedProcesses) {
               << " (Quantum: " << process.quantum
               << ") (Prioridade: " << process.priority << ")"
               << ") (Intruções: " << process.instructions << ").\n";
-    process.state = State::Running;
+    process.state.store(State::Running);
 
     std::vector<std::unique_ptr<IORequest>> ioRequests;
-    bool printLock = true;
+    std::atomic<bool> printLock{true};
 
     Core(memManager, process, &ioRequests, printLock);
 
-    switch (process.state) {
+    switch (process.state.load()) {
     case State::Blocked:
         std::cout << "[Scheduler] Processo " << process.pid
                   << " bloqueado por I/O. Entregando ao IOManager.\n";
@@ -149,7 +155,7 @@ void Simulator::executeProcess(PCB &process, int &finishedProcesses) {
     default:
         std::cout << "[Scheduler] Quantum do processo " << process.pid
                   << " expirou. Voltando para a fila.\n";
-        process.state = State::Ready;
+        process.state.store(State::Ready);
         readyQueue.push_back(&process);
         break;
     }

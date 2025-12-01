@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "task_id": "cadeia_forwarding",
+    "author": "teste",
+    "description": "Sequência LW seguida de aritmética dependente, testando o mecanismo de forwarding."
+  },
+  "data": {
+    "vec": [3, 6, 9, 12],
+    "sink": [0, 0]
+  },
+  "program": [
+    { "label": "start", "instruction": "lw", "rt": "$t0", "offset": 0, "base": "vec" },
+    { "instruction": "addi", "rt": "$t1", "rs": "$t0", "immediate": 1 },
+    { "instruction": "add", "rd": "$t2", "rs": "$t1", "rt": "$t1" },
+    { "instruction": "add", "rd": "$t3", "rs": "$t2", "rt": "$t1" },
+    { "instruction": "sw", "rt": "$t3", "offset": 0, "base": "sink" },
+    { "instruction": "print", "rt": "$t3" },
+    { "instruction": "lw", "rt": "$t4", "offset": 1, "base": "vec" },
+    { "instruction": "add", "rd": "$t5", "rs": "$t4", "rt": "$t3" },
+    { "instruction": "sw", "rt": "$t5", "offset": 1, "base": "sink" },
+    { "instruction": "print", "rt": "$t5" },
+    { "instruction": "end" }
+  ]
+}
