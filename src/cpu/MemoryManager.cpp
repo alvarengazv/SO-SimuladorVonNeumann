@@ -1,9 +1,12 @@
 #include "MemoryManager.hpp"
 
+#include <iostream>
+
 MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize) {
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
     L1_cache = std::make_unique<Cache>();
+    L1_cache->setReplacementPolicy(DEFAULT_CACHE_POLICY);
     mainMemoryLimit = mainMemorySize;
 }
 
@@ -59,6 +62,29 @@ void MemoryManager::write(uint32_t address, uint32_t data, PCB& process) {
     L1_cache->update(address, data);
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
+}
+
+void MemoryManager::setCacheReplacementPolicy(int policyCode) {
+    if (!L1_cache) {
+        return;
+    }
+
+    ReplacementPolicy selected = DEFAULT_CACHE_POLICY;
+    switch (policyCode) {
+    case 0:
+        selected = ReplacementPolicy::FIFO;
+        break;
+    case 1:
+        selected = ReplacementPolicy::LRU;
+        break;
+    default:
+        std::cerr << "[Cache] Política desconhecida (" << policyCode
+                  << "). Mantendo padrão FIFO.\n";
+        selected = DEFAULT_CACHE_POLICY;
+        break;
+    }
+
+    L1_cache->setReplacementPolicy(selected);
 }
 
 // Função chamada pela cache para escrever dados "sujos" de volta na memória

@@ -17,6 +17,8 @@ public:
     // Métodos unificados agora recebem o PCB para as métricas
     uint32_t read(uint32_t address, PCB& process);
     void write(uint32_t address, uint32_t data, PCB& process);
+
+    void setCacheReplacementPolicy(int policyCode);
     
     // Função auxiliar para o write-back da cache
     void writeToFile(uint32_t address, uint32_t data);

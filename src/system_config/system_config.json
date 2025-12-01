@@ -12,7 +12,8 @@
     "cache": {
         "size": 2048,
         "line_size": 64,
-        "weight": 1
+        "weight": 1,
+        "policy": 0
     },
     "cpu": {
         "cores": 4

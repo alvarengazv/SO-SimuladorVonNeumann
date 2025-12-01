@@ -2,21 +2,37 @@
 #include "cachePolicy.hpp"
 #include "../MemoryManager.hpp" // Necessário para a lógica de write-back
 
-Cache::Cache() {
+#include <limits>
+
+Cache::Cache()
+    : currentPolicy(ReplacementPolicy::FIFO) {
     this->capacity = CACHE_CAPACITY;
     this->cacheMap.reserve(CACHE_CAPACITY);
+    this->lruPositions.reserve(CACHE_CAPACITY);
     this->cache_misses = 0;
     this->cache_hits = 0;
 }
 
 Cache::~Cache() {
     this->cacheMap.clear();
+    this->lruOrder.clear();
+    this->lruPositions.clear();
 }
 
 size_t Cache::get(size_t address) {
-    if (cacheMap.count(address) > 0 && cacheMap[address].isValid) {
+    auto entryIt = cacheMap.find(address);
+    if (entryIt != cacheMap.end() && entryIt->second.isValid) {
         cache_hits++;
-        return cacheMap[address].data; // Cache hit
+
+        if (currentPolicy == ReplacementPolicy::LRU) {
+            auto posIt = lruPositions.find(address);
+            if (posIt != lruPositions.end()) {
+                lruOrder.splice(lruOrder.begin(), lruOrder, posIt->second);
+                posIt->second = lruOrder.begin();
+            }
+        }
+
+        return entryIt->second.data; // Cache hit
     }
 
     cache_misses++;
@@ -24,24 +40,46 @@ size_t Cache::get(size_t address) {
 }
 
 void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
+    auto existingIt = cacheMap.find(address);
+    if (existingIt != cacheMap.end()) {
+        existingIt->second.data = data;
+        existingIt->second.isValid = true;
+        existingIt->second.isDirty = false;
+
+        if (currentPolicy == ReplacementPolicy::LRU) {
+            auto posIt = lruPositions.find(address);
+            if (posIt != lruPositions.end()) {
+                lruOrder.splice(lruOrder.begin(), lruOrder, posIt->second);
+                posIt->second = lruOrder.begin();
+            }
+        }
+        return;
+    }
+
     // Se a cache está cheia, precisamos remover um item
     if (cacheMap.size() >= capacity) {
         CachePolicy cachepolicy;
-        // A política de remoção nos dirá qual endereço remover
-        size_t addr_to_remove = cachepolicy.getAddressToReplace(fifo_queue);
+        size_t addr_to_remove;
+        if (currentPolicy == ReplacementPolicy::LRU) {
+            addr_to_remove = cachepolicy.getAddressToReplace(lruOrder);
+        } else {
+            addr_to_remove = cachepolicy.getAddressToReplace(fifoQueue);
+        }
 
-        if (addr_to_remove != -1) {
-            CacheEntry& entry_to_remove = cacheMap[addr_to_remove];
+        if (addr_to_remove != std::numeric_limits<size_t>::max()) {
+            auto removeIt = cacheMap.find(addr_to_remove);
+            if (removeIt != cacheMap.end()) {
+                CacheEntry& entry_to_remove = removeIt->second;
 
-            // Lógica de WRITE-BACK: se o bloco a ser removido estiver sujo...
-            if (entry_to_remove.isDirty) {
-                // ...escreve o dado de volta na memória usando o MemoryManager.
-                // Aqui passamos 'nullptr' para o PCB, pois a operação de write-back
-                // é do sistema de memória e não de um processo específico.
-                memManager->writeToFile(addr_to_remove, entry_to_remove.data);
+                if (entry_to_remove.isDirty) {
+                    memManager->writeToFile(addr_to_remove, entry_to_remove.data);
+                }
+                cacheMap.erase(removeIt);
             }
-            // Remove da cache
-            cacheMap.erase(addr_to_remove);
+
+            if (currentPolicy == ReplacementPolicy::LRU) {
+                lruPositions.erase(addr_to_remove);
+            }
         }
     }
 
@@ -52,7 +90,12 @@ void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
     new_entry.isDirty = false; // Começa como "limpo"
 
     cacheMap[address] = new_entry;
-    fifo_queue.push(address); // Adiciona na fila do FIFO
+    if (currentPolicy == ReplacementPolicy::LRU) {
+        lruOrder.push_front(address);
+        lruPositions[address] = lruOrder.begin();
+    } else {
+        fifoQueue.push(address);
+    }
 }
 
 void Cache::update(size_t address, size_t data) {
@@ -68,15 +111,25 @@ void Cache::update(size_t address, size_t data) {
     cacheMap[address].data = data;
     cacheMap[address].isDirty = true; // Marca como sujo
     cacheMap[address].isValid = true;
+
+    if (currentPolicy == ReplacementPolicy::LRU) {
+        auto posIt = lruPositions.find(address);
+        if (posIt != lruPositions.end()) {
+            lruOrder.splice(lruOrder.begin(), lruOrder, posIt->second);
+            posIt->second = lruOrder.begin();
+        }
+    }
 }
 
 void Cache::invalidate() {
     for (auto &c : cacheMap) {
         c.second.isValid = false;
     }
-    // Limpar a fila FIFO também, pois a cache foi invalidada
+    // Limpar as estruturas auxiliares também, pois a cache foi invalidada
     std::queue<size_t> empty;
-    fifo_queue.swap(empty);
+    fifoQueue.swap(empty);
+    lruOrder.clear();
+    lruPositions.clear();
 }
 
 std::vector<std::pair<size_t, size_t>> Cache::dirtyData() {
@@ -96,4 +149,38 @@ int Cache::get_misses(){
 int Cache::get_hits(){
        // Retorna o número de cache hits
     return cache_hits;
+}
+
+void Cache::setReplacementPolicy(ReplacementPolicy policy) {
+    if (currentPolicy == policy) {
+        return;
+    }
+
+    currentPolicy = policy;
+    // Limpa e reinicia as estruturas auxiliares para evitar rastros da política anterior
+    std::queue<size_t> empty;
+    fifoQueue.swap(empty);
+    lruOrder.clear();
+    lruPositions.clear();
+
+    if (currentPolicy == ReplacementPolicy::LRU) {
+        lruPositions.reserve(cacheMap.size());
+    }
+
+    for (const auto& entry : cacheMap) {
+        if (!entry.second.isValid) {
+            continue;
+        }
+
+        if (currentPolicy == ReplacementPolicy::FIFO) {
+            fifoQueue.push(entry.first);
+        } else {
+            lruOrder.push_front(entry.first);
+            lruPositions[entry.first] = lruOrder.begin();
+        }
+    }
+}
+
+ReplacementPolicy Cache::getReplacementPolicy() const {
+    return currentPolicy;
 }

@@ -37,7 +37,7 @@ int Simulator::run() {
     if (!loadProcesses()) {
         return 1;
     }
-
+    memManager.setCacheReplacementPolicy(config.cache.policy); //onde vai chamar pra trocar a politica de substituição da cache
     scheduler = std::make_unique<ProcessScheduler>(config.scheduling.algorithm, readyQueue);
 
     const int totalProcesses = static_cast<int>(processList.size());

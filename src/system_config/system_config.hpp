@@ -24,6 +24,7 @@ struct CacheConfig {
     int size;
     int line_size;
     int weight;
+    int policy;
 };
 
 struct CpuConfig {
@@ -64,6 +65,7 @@ public:
         config.cache.size = j.at("cache").at("size").get<int>();
         config.cache.line_size = j.at("cache").at("line_size").get<int>();
         config.cache.weight = j.at("cache").at("weight").get<int>();
+        config.cache.policy = j.at("cache").at("policy").get<int>();
 
         config.cpu.cores = j.at("cpu").at("cores").get<int>();
 

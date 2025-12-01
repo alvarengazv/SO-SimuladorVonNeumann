@@ -2,13 +2,22 @@
 #define CACHE_HPP
 
 #include <cstdint>
-#include <cstddef> 
+#include <cstddef>
+#include <list>
+#include <queue>
 #include <unordered_map>
 #include <vector>
-#include <queue> // Adicionado para FIFO
 
 #define CACHE_CAPACITY 16
 #define CACHE_MISS UINT32_MAX
+
+enum class ReplacementPolicy {
+    FIFO,
+    LRU
+};
+
+// Ajuste aqui para escolher a política padrão usada pelo simulador.
+constexpr ReplacementPolicy DEFAULT_CACHE_POLICY = ReplacementPolicy::FIFO;
 
 struct CacheEntry {
     size_t data;
@@ -20,7 +29,10 @@ class MemoryManager;
 class Cache {
 private:
     std::unordered_map<size_t, CacheEntry> cacheMap;
-    std::queue<size_t> fifo_queue; // Fila para controlar a ordem de entrada (FIFO)
+    std::queue<size_t> fifoQueue; // Controle para FIFO
+    std::list<size_t> lruOrder; // Controle para LRU
+    std::unordered_map<size_t, std::list<size_t>::iterator> lruPositions;
+    ReplacementPolicy currentPolicy;
     size_t capacity;
     int cache_misses;
     int cache_hits;
@@ -36,6 +48,9 @@ public:
     void update(size_t address, size_t data);
     void invalidate();
     std::vector<std::pair<size_t, size_t>> dirtyData(); // Mantido para possíveis outras lógicas
+
+    void setReplacementPolicy(ReplacementPolicy policy);
+    ReplacementPolicy getReplacementPolicy() const;
 };
 
 #endif
