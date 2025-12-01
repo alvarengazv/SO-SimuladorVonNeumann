@@ -5,14 +5,19 @@ void print_metrics(const PCB &pcb) {
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
     std::cout << "Estado Final:           "
               << (pcb.state.load() == State::Finished ? "Finished" : "Incomplete") << "\n";
+    std::cout << "Timestamp Final:        " << pcb.timeStamp << "\n";
     std::cout << "Ciclos de Pipeline:     " << pcb.pipeline_cycles.load() << "\n";
+    std::cout << "Ciclos de IO:           " << pcb.io_cycles.load() << "\n";
     std::cout << "Total de Acessos a Mem: " << pcb.mem_accesses_total.load() << "\n";
     std::cout << "  - Leituras:             " << pcb.mem_reads.load() << "\n";
     std::cout << "  - Escritas:             " << pcb.mem_writes.load() << "\n";
     std::cout << "Acessos a Cache L1:     " << pcb.cache_mem_accesses.load() << "\n";
+    std::cout << "  - Cache Hits:             " << pcb.cache_hits.load() << "\n";
+    std::cout << "  - Cache Misses:           " << pcb.cache_misses.load() << "\n";
     std::cout << "Acessos a Mem Principal:" << pcb.primary_mem_accesses.load() << "\n";
     std::cout << "Acessos a Mem Secundaria:" << pcb.secondary_mem_accesses.load() << "\n";
     std::cout << "Ciclos Totais de Memoria: " << pcb.memory_cycles.load() << "\n";
+    std::cout << "Tempo Total de Execução:  " << pcb.totalTimeExecution() << "\n";
     std::cout << "------------------------------------------\n";
     // cria pasta "output" se não existir
     std::filesystem::create_directory("output");
@@ -33,11 +38,12 @@ void print_metrics(const PCB &pcb) {
             resultados << "=== Resultados de Execução ===\n";
         }
         resultados << "\n[Processo PID " << pcb.pid << "] " << pcb.name << "\n";
-        resultados << "Quantum: " << pcb.quantum << " | Prioridade: " << pcb.priority << "\n";
+        resultados << "Quantum: " << pcb.quantum << " | Timestamp: " << pcb.timeStamp << " | Prioridade: " << pcb.priority << "\n";
         resultados << "Ciclos de Pipeline: " << pcb.pipeline_cycles << "\n";
         resultados << "Ciclos de Memória: " << pcb.memory_cycles << "\n";
         resultados << "Cache Hits: " << pcb.cache_hits << " | Cache Misses: " << pcb.cache_misses << "\n";
         resultados << "Ciclos de IO: " << pcb.io_cycles << "\n";
+        resultados << "Tempo Total de Execução: " << pcb.totalTimeExecution() << "\n";
         resultados << "Saída do Programa:\n";
         if (programOutput.empty()) {
             resultados << "  (Sem saída registrada)\n";

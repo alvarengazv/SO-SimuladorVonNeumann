@@ -31,9 +31,10 @@ struct MemWeights {
 
 struct PCB {
     int pid = 0;
+    int coreAssigned = -1;
     std::string name;
     int quantum = 0;
-    int timeStamp;
+    int timeStamp = 0;
     int priority = 0;
     int instructions;
 
@@ -73,6 +74,10 @@ struct PCB {
     std::vector<std::string> snapshotProgramOutput() const {
         std::lock_guard<std::mutex> lock(outputMutex);
         return programOutput;
+    }
+
+    int totalTimeExecution() const {
+        return (timeStamp + memory_cycles.load() + io_cycles.load());
     }
 };
 
