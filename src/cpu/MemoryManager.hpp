@@ -13,7 +13,7 @@ const size_t MAIN_MEMORY_SIZE = 1024;
 
 class MemoryManager {
 public:
-    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize);
+    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheCapacity);
 
     // Métodos unificados agora recebem o PCB para as métricas
     uint32_t read(uint32_t address, PCB& process);
@@ -22,7 +22,7 @@ public:
     void setCacheReplacementPolicy(int policyCode);
     
     // Função auxiliar para o write-back da cache
-    void writeToFile(uint32_t address, uint32_t data);
+    void writeToFile(uint32_t address, uint32_t data, PCB& process);
 
 private:
     std::unique_ptr<MAIN_MEMORY> mainMemory;

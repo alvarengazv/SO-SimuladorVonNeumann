@@ -31,7 +31,7 @@ std::string schedulerName(int algorithm) {
 
 Simulator::Simulator(const std::string &configPath)
     : config(SystemConfig::loadFromFile(configPath)),
-      memManager(config.main_memory.total, config.secondary_memory.total),
+      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size),
       ioManager() {}
 
 int Simulator::run() {
@@ -104,9 +104,12 @@ bool Simulator::loadProcessDefinition(const std::string &pcbFile,
     }
 
     std::cout << "Carregando programa '" << taskLabel << "' para o processo " << process->pid << "...\n";
-    loadJsonProgram(taskFile, memManager, *process, baseAddress);
+    int startCodeAddr = loadJsonProgram(taskFile, memManager, *process, baseAddress);
 
-    process->regBank.pc.write(baseAddress);
+    process->regBank.pc.write(startCodeAddr);
+    process->memWeights.cache = static_cast<uint64_t>(config.cache.weight);
+    process->memWeights.primary = static_cast<uint64_t>(config.main_memory.weight);
+    process->memWeights.secondary = static_cast<uint64_t>(config.secondary_memory.weight);
 
     readyQueue.push_back(process.get());
     processList.push_back(std::move(process));

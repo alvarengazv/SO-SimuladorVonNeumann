@@ -17,11 +17,6 @@ bool load_pcb_from_json(const std::string &path, PCB &pcb) {
         pcb.name = j.value("name", std::string(""));
         pcb.quantum = j.value("quantum", 0);
         pcb.priority = j.value("priority", 0);
-        if (j.contains("mem_weights")) {
-            auto &mw = j["mem_weights"];
-            pcb.memWeights.primary = mw.value("primary", 1ULL);
-            pcb.memWeights.secondary = mw.value("secondary", 10ULL);
-        }
         return true;
     } catch (...) {
         return false;

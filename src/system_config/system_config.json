@@ -10,10 +10,10 @@
         "weight": 500
     },
     "cache": {
-        "size": 2048,
+        "size": 64,
         "line_size": 64,
         "weight": 1,
-        "policy": 0
+        "policy": 1
     },
     "cpu": {
         "cores": 4

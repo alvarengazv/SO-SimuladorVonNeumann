@@ -337,7 +337,10 @@ int loadJsonProgram(const string &filename, MemoryManager &memManager, PCB& pcb,
 
     json j = readJsonFile(filename);
     int addr = startAddr;
-    if (j.contains("data"))    addr = parseData(j["data"], memManager, pcb, addr);
-    if (j.contains("program")) addr = parseProgram(j["program"], memManager, pcb, addr);
-    return addr;
+    if (j.contains("data"))    
+        addr = parseData(j["data"], memManager, pcb, addr);
+    int codeStart = addr;
+    if (j.contains("program")) 
+        addr = parseProgram(j["program"], memManager, pcb, addr);
+    return codeStart;
 }

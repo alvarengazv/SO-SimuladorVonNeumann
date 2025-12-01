@@ -2,9 +2,5 @@
   "pid": 3,
   "name": "io_bound_sim",
   "quantum": 0,
-  "priority": 0,
-  "mem_weights": {
-    "primary": 10,
-    "secondary": 50
-  }
+  "priority": 0
 }

@@ -2,9 +2,5 @@
   "pid": 2,
   "name": "contador_loop",
   "quantum": 0,
-  "priority": 0,
-  "mem_weights": {
-    "primary": 2,
-    "secondary": 10
-  }
+  "priority": 0
 }

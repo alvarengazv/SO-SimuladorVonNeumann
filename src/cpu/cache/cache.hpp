@@ -10,7 +10,8 @@
 #include <queue> // Adicionado para FIFO
 #include <mutex>
 
-#define CACHE_CAPACITY 16
+#include "../PCB.hpp" // Necessário para interagir com o PCB
+
 #define CACHE_MISS UINT32_MAX
 
 enum class ReplacementPolicy {
@@ -18,8 +19,7 @@ enum class ReplacementPolicy {
     LRU
 };
 
-// Ajuste aqui para escolher a política padrão usada pelo simulador.
-constexpr ReplacementPolicy DEFAULT_CACHE_POLICY = ReplacementPolicy::FIFO;
+struct PCB;
 
 struct CacheEntry {
     size_t data;
@@ -41,13 +41,13 @@ private:
     mutable std::mutex cacheMutex;
 
 public:
-    Cache();
+    Cache(size_t CACHE_CAPACITY);
     ~Cache();
     int get_misses();
     int get_hits();
     size_t get(size_t address);
     // O método put agora precisa interagir com o MemoryManager para o write-back
-    void put(size_t address, size_t data, MemoryManager* memManager);
+    void put(size_t address, size_t data, MemoryManager* memManager, PCB& process);
     void update(size_t address, size_t data);
     void invalidate();
     std::vector<std::pair<size_t, size_t>> dirtyData(); // Mantido para possíveis outras lógicas

@@ -4,7 +4,7 @@
 
 #include <limits>
 
-Cache::Cache()
+Cache::Cache(size_t CACHE_CAPACITY)
     : currentPolicy(ReplacementPolicy::FIFO) {
     this->capacity = CACHE_CAPACITY;
     this->cacheMap.reserve(CACHE_CAPACITY);
@@ -40,7 +40,7 @@ size_t Cache::get(size_t address) {
     return CACHE_MISS; // Cache miss
 }
 
-void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
+void Cache::put(size_t address, size_t data, MemoryManager* memManager, PCB& process) {
     std::lock_guard<std::mutex> lock(cacheMutex);
     auto existingIt = cacheMap.find(address);
     if (existingIt != cacheMap.end()) {
@@ -74,7 +74,7 @@ void Cache::put(size_t address, size_t data, MemoryManager* memManager) {
                 CacheEntry& entry_to_remove = removeIt->second;
 
                 if (entry_to_remove.isDirty) {
-                    memManager->writeToFile(addr_to_remove, entry_to_remove.data);
+                    memManager->writeToFile(addr_to_remove, entry_to_remove.data, process);
                 }
                 cacheMap.erase(removeIt);
             }

@@ -2,11 +2,10 @@
 
 #include <iostream>
 
-MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize) {
+MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheCapacity) {
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
-    L1_cache = std::make_unique<Cache>();
-    L1_cache->setReplacementPolicy(DEFAULT_CACHE_POLICY);
+    L1_cache = std::make_unique<Cache>(cacheCapacity);
     mainMemoryLimit = mainMemorySize;
 }
 
@@ -41,7 +40,7 @@ uint32_t MemoryManager::read(uint32_t address, PCB& process) {
     }
 
     // 3. Após a busca, armazena o dado na cache
-    L1_cache->put(address, data_from_mem, this);
+    L1_cache->put(address, data_from_mem, this, process);
 
     return data_from_mem;
 }
@@ -55,7 +54,7 @@ void MemoryManager::write(uint32_t address, uint32_t data, PCB& process) {
 
     if (cache_data == CACHE_MISS) {
         contabiliza_cache(process, false); // MISS
-        L1_cache->put(address, data, this);
+        L1_cache->put(address, data, this, process);
     } else {
         contabiliza_cache(process, true);  // HIT
     }
@@ -71,7 +70,7 @@ void MemoryManager::setCacheReplacementPolicy(int policyCode) {
         return;
     }
 
-    ReplacementPolicy selected = DEFAULT_CACHE_POLICY;
+    ReplacementPolicy selected;
     switch (policyCode) {
     case 0:
         selected = ReplacementPolicy::FIFO;
@@ -82,7 +81,7 @@ void MemoryManager::setCacheReplacementPolicy(int policyCode) {
     default:
         std::cerr << "[Cache] Política desconhecida (" << policyCode
                   << "). Mantendo padrão FIFO.\n";
-        selected = DEFAULT_CACHE_POLICY;
+        selected = ReplacementPolicy::FIFO;
         break;
     }
 
@@ -90,12 +89,16 @@ void MemoryManager::setCacheReplacementPolicy(int policyCode) {
 }
 
 // Função chamada pela cache para escrever dados "sujos" de volta na memória
-void MemoryManager::writeToFile(uint32_t address, uint32_t data) {
+void MemoryManager::writeToFile(uint32_t address, uint32_t data, PCB& process) {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     if (address < mainMemoryLimit) {
         mainMemory->WriteMem(address, data);
+        process.primary_mem_accesses.fetch_add(1);
+        process.memory_cycles.fetch_add(process.memWeights.primary);
     } else {
         uint32_t secondaryAddress = address - mainMemoryLimit;
         secondaryMemory->WriteMem(secondaryAddress, data);
+        process.secondary_mem_accesses.fetch_add(1);
+        process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
 }
