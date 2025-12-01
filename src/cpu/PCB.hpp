@@ -9,6 +9,8 @@
 #include <string>
 #include <atomic>
 #include <cstdint>
+#include <vector>
+#include <mutex>
 #include "cache/cache.hpp"
 #include "datapath/REGISTER_BANK.hpp" // necessidade de objeto completo dentro do PCB
 
@@ -35,7 +37,7 @@ struct PCB {
     int priority = 0;
     int instructions;
 
-    State state = State::Ready;
+    std::atomic<State> state{State::Ready};
     hw::REGISTER_BANK regBank;
 
     // Contadores de acesso à memória
@@ -58,6 +60,20 @@ struct PCB {
     std::atomic<uint64_t> io_cycles{1};
 
     MemWeights memWeights;
+
+    // Saída lógica gerada pelo programa (ex.: instruções PRINT)
+    std::vector<std::string> programOutput;
+    mutable std::mutex outputMutex;
+
+    void appendProgramOutput(const std::string &line) {
+        std::lock_guard<std::mutex> lock(outputMutex);
+        programOutput.push_back(line);
+    }
+
+    std::vector<std::string> snapshotProgramOutput() const {
+        std::lock_guard<std::mutex> lock(outputMutex);
+        return programOutput;
+    }
 };
 
 // Contabilizar cache

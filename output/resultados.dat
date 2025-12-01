@@ -1,10 +1,239 @@
-=== Resultados de Execução ===
-PID: 3
-Nome: io_bound_sim
-Quantum: 150
-Prioridade: 0
-Ciclos de Pipeline: 26
-Ciclos de Memória: 372
-Cache Hits: 9
-Cache Misses: 48
+[Processo PID 2] contador_loop
+Quantum: 18 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 47
+Cache Hits: 2 | Cache Misses: 27
 Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 41 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 475
+Cache Hits: 2 | Cache Misses: 68
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 53 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 196
+Cache Hits: 3 | Cache Misses: 53
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 15 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 614
+Cache Hits: 4 | Cache Misses: 166
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 136 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 619
+Cache Hits: 3 | Cache Misses: 168
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 15 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 47
+Cache Hits: 2 | Cache Misses: 27
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 138 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 475
+Cache Hits: 2 | Cache Misses: 68
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 25 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 191
+Cache Hits: 4 | Cache Misses: 51
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 99 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 619
+Cache Hits: 3 | Cache Misses: 168
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 28 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 47
+Cache Hits: 2 | Cache Misses: 27
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 52 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 475
+Cache Hits: 2 | Cache Misses: 68
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 51 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 196
+Cache Hits: 3 | Cache Misses: 53
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 114 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 620
+Cache Hits: 3 | Cache Misses: 112
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 26 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 48
+Cache Hits: 2 | Cache Misses: 18
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 126 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 475
+Cache Hits: 2 | Cache Misses: 45
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 140 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 197
+Cache Hits: 3 | Cache Misses: 35
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 93 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 29
+Cache Hits: 1 | Cache Misses: 9
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 112 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 245
+Cache Hits: 2 | Cache Misses: 22
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 109 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 106
+Cache Hits: 2 | Cache Misses: 17
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 15 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 339
+Cache Hits: 2 | Cache Misses: 56
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 123 | Prioridade: 0
+Ciclos de Pipeline: 53
+Ciclos de Memória: 395
+Cache Hits: 4 | Cache Misses: 111
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 47 | Prioridade: 0
+Ciclos de Pipeline: 8
+Ciclos de Memória: 38
+Cache Hits: 2 | Cache Misses: 18
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 3] io_bound_sim
+Quantum: 46 | Prioridade: 0
+Ciclos de Pipeline: 21
+Ciclos de Memória: 267
+Cache Hits: 2 | Cache Misses: 45
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------
+
+[Processo PID 4] hazard_forwarding
+Quantum: 27 | Prioridade: 0
+Ciclos de Pipeline: 16
+Ciclos de Memória: 123
+Cache Hits: 3 | Cache Misses: 35
+Ciclos de IO: 1
+Saída do Programa:
+  (Sem saída registrada)
+------------------------------------------

@@ -3,7 +3,8 @@
 void print_metrics(const PCB &pcb) {
     std::cout << "\n--- METRICAS FINAIS DO PROCESSO " << pcb.pid << " ---\n";
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
-    std::cout << "Estado Final:           " << (pcb.state == State::Finished ? "Finished" : "Incomplete") << "\n";
+    std::cout << "Estado Final:           "
+              << (pcb.state.load() == State::Finished ? "Finished" : "Incomplete") << "\n";
     std::cout << "Ciclos de Pipeline:     " << pcb.pipeline_cycles.load() << "\n";
     std::cout << "Total de Acessos a Mem: " << pcb.mem_accesses_total.load() << "\n";
     std::cout << "  - Leituras:             " << pcb.mem_reads.load() << "\n";
@@ -16,36 +17,58 @@ void print_metrics(const PCB &pcb) {
     // cria pasta "output" se não existir
     std::filesystem::create_directory("output");
 
-    // abre arquivos
-    std::ofstream resultados("output/resultados.dat");
-    std::ofstream output("output/output.dat");
+    const std::string resultadosPath = "output/resultados.dat";
+    const std::string outputPath = "output/output.dat";
 
+    auto fileNeedsHeader = [](const std::string &path) {
+        return !std::filesystem::exists(path) || std::filesystem::file_size(path) == 0;
+    };
+
+    auto programOutput = pcb.snapshotProgramOutput();
+
+    std::ofstream resultados(resultadosPath, std::ios::app);
     if (resultados.is_open())
     {
-        resultados << "=== Resultados de Execução ===\n";
-        resultados << "PID: " << pcb.pid << "\n";
-        resultados << "Nome: " << pcb.name << "\n";
-        resultados << "Quantum: " << pcb.quantum << "\n";
-        resultados << "Prioridade: " << pcb.priority << "\n";
+        if (fileNeedsHeader(resultadosPath)) {
+            resultados << "=== Resultados de Execução ===\n";
+        }
+        resultados << "\n[Processo PID " << pcb.pid << "] " << pcb.name << "\n";
+        resultados << "Quantum: " << pcb.quantum << " | Prioridade: " << pcb.priority << "\n";
         resultados << "Ciclos de Pipeline: " << pcb.pipeline_cycles << "\n";
         resultados << "Ciclos de Memória: " << pcb.memory_cycles << "\n";
-        resultados << "Cache Hits: " << pcb.cache_hits << "\n";
-        resultados << "Cache Misses: " << pcb.cache_misses << "\n";
+        resultados << "Cache Hits: " << pcb.cache_hits << " | Cache Misses: " << pcb.cache_misses << "\n";
         resultados << "Ciclos de IO: " << pcb.io_cycles << "\n";
+        resultados << "Saída do Programa:\n";
+        if (programOutput.empty()) {
+            resultados << "  (Sem saída registrada)\n";
+        } else {
+            for (const auto &line : programOutput) {
+                resultados << "  -> " << line << "\n";
+            }
+        }
+        resultados << "------------------------------------------\n";
     }
 
+    std::ofstream output(outputPath, std::ios::app);
     if (output.is_open())
     {
-        output << "=== Saída Lógica do Programa ===\n";
+        if (fileNeedsHeader(outputPath)) {
+            output << "=== Saída Lógica do Programa ===\n";
+        }
+        output << "\n[Programa: " << pcb.name << " | PID " << pcb.pid << "]\n";
+        output << "Saída declarada:\n";
+        if (programOutput.empty()) {
+            output << "  (Sem saída registrada)\n";
+        } else {
+            for (const auto &line : programOutput) {
+                output << "  -> " << line << "\n";
+            }
+        }
 
-        // Dump de registradores
-        output << "Registradores principais:\n";
+        output << "\nRegistradores principais:\n";
         output << pcb.regBank.get_registers_as_string() << "\n";
 
-        // Inserir operações registradas
         output << "\n=== Operações Executadas ===\n";
-
-        // Lê o arquivo temporário com operações
         std::string temp_filename = "output/temp_1.log";
         if (std::filesystem::exists(temp_filename))
         {
@@ -59,15 +82,12 @@ void print_metrics(const PCB &pcb) {
                 }
                 temp_file.close();
             }
-
-            // Remove arquivo temporário após consolidar
             std::filesystem::remove(temp_filename);
         }
         else
         {
             output << "(Nenhuma operação registrada)\n";
         }
-
         output << "\n=== Fim das Operações Registradas ===\n";
     }
 

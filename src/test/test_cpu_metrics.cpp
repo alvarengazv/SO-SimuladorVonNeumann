@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <atomic>
 
 #include "cpu/pcb_loader.hpp"
 #include "cpu/PCB.hpp"
@@ -76,14 +77,15 @@ int main() {
     memManager.write(28, 0, pcb); // Usando um endereço diferente para o dado
 
     std::vector<std::unique_ptr<IORequest>> ioRequests;
-    bool printLock = false;
+    std::atomic<bool> printLock{false};
 
     // Executa núcleo
     Core(memManager, pcb, &ioRequests, printLock);
 
     // Métricas
     std::cout << "=== METRICAS PCB ===\n";
-    std::cout << "pid: " << pcb.pid << " name: " << pcb.name << " state: " << (pcb.state == State::Finished ? "Finished" : "NotFinished") << "\n";
+    std::cout << "pid: " << pcb.pid << " name: " << pcb.name << " state: "
+              << (pcb.state.load() == State::Finished ? "Finished" : "NotFinished") << "\n";
     std::cout << "pipeline_cycles:      " << pcb.pipeline_cycles.load() << "\n";
     std::cout << "stage_invocations:    " << pcb.stage_invocations.load() << "\n";
     std::cout << "mem_reads:            " << pcb.mem_reads.load() << "\n";
