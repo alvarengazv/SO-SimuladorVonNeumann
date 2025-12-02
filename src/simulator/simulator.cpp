@@ -1,17 +1,5 @@
 #include "simulator.hpp"
 
-#include <algorithm>
-#include <chrono>
-#include <cstdint>
-#include <iostream>
-#include <thread>
-#include <atomic>
-
-#include "../cpu/CONTROL_UNIT.hpp"
-#include "../cpu/pcb_loader.hpp"
-#include "../metrics/metrics.hpp"
-#include "../parser_json/parser_json.hpp"
-
 namespace {
 std::string schedulerName(int algorithm) {
     switch (algorithm) {
@@ -42,27 +30,16 @@ int Simulator::run() {
     memManager.setCacheReplacementPolicy(config.cache.policy); //onde vai chamar pra trocar a politica de substituição da cache
     scheduler = std::make_unique<ProcessScheduler>(config.scheduling.algorithm, readyQueue);
 
-    const int totalProcesses = static_cast<int>(processList.size());
-    int finishedProcesses = 0;
-
     std::cout << "\nIniciando escalonador " << schedulerName(config.scheduling.algorithm) << "...\n";
 
-    while (finishedProcesses < totalProcesses) {
-        moveUnblockedProcesses();
+    // Medir tempo de execução total
+    auto startTime = std::chrono::high_resolution_clock::now();
 
-        if (readyQueue.empty()) {
-            if (blockedQueue.empty()) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            continue;
-        }
-
-        PCB *currentProcess = scheduler->scheduler(readyQueue);
-        readyQueue.erase(std::remove(readyQueue.begin(), readyQueue.end(), currentProcess), readyQueue.end());
-
-        executeProcess(*currentProcess, finishedProcesses);
-    }
+    executeProcesses();
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
+    std::cout << "\nTempo total de execução do simulador: " << elapsedSeconds.count() << " segundos.\n";
 
     std::cout << "\nTodos os processos foram finalizados. Encerrando o simulador.\n";
     return 0;
@@ -129,18 +106,67 @@ void Simulator::moveUnblockedProcesses() {
     }
 }
 
-void Simulator::executeProcess(PCB &process, int &finishedProcesses) {
-    std::cout << "\n[Scheduler] Executando processo " << process.pid
-              << " (Quantum: " << process.quantum
-              << ") (Prioridade: " << process.priority << ")"
-              << ") (Intruções: " << process.instructions << ").\n";
-    process.state.store(State::Running);
+void Simulator::executeProcesses() {
+    const int totalProcesses = static_cast<int>(processList.size());
+    int finishedProcesses = 0;
 
-    std::vector<std::unique_ptr<IORequest>> ioRequests;
-    std::atomic<bool> printLock{true};
+    const int numCores = std::max(1, config.cpu.cores);
+    std::vector<std::unique_ptr<CPUCore>> cpuCores;
+    std::vector<PCB *> coreAssignments(numCores, nullptr);
+    std::queue<int> idleCoresIdx;
 
-    Core(memManager, process, &ioRequests, printLock);
+    for (int i = 0; i < numCores; ++i) {
+        cpuCores.push_back(std::make_unique<CPUCore>(i, memManager, ioManager));
+        cpuCores.back()->start();
+        idleCoresIdx.push(i);
+    }
 
+    while (finishedProcesses < totalProcesses) {
+        moveUnblockedProcesses();
+        reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
+
+        if (readyQueue.empty()) {
+            reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
+
+            if (blockedQueue.empty() && readyQueue.empty() && allCoresIdle(coreAssignments)) {
+                break;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            continue;
+        }
+
+        PCB *currentProcess = scheduler->scheduler(readyQueue);
+        readyQueue.erase(std::remove(readyQueue.begin(), readyQueue.end(), currentProcess), readyQueue.end());
+
+        currentProcess->state.store(State::Running);
+
+        while (idleCoresIdx.empty()) {
+            reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
+            if (idleCoresIdx.empty()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+
+        int coreIdx = idleCoresIdx.front();
+        idleCoresIdx.pop();
+        coreAssignments[coreIdx] = currentProcess;
+        cpuCores[coreIdx]->submitProcess(currentProcess);
+        currentProcess->coresAssigned.push_back(coreIdx);
+        std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
+                  << " (Quantum: " << currentProcess->quantum
+                  << ") (Prioridade: " << currentProcess->priority << ")"
+                  << ") (Intruções: " << currentProcess->instructions << ").\n";
+    }
+
+    reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
+
+    for (auto &core : cpuCores) {
+        core->stop();
+    }
+}
+
+void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
     switch (process.state.load()) {
     case State::Blocked:
         std::cout << "[Scheduler] Processo " << process.pid
@@ -162,4 +188,29 @@ void Simulator::executeProcess(PCB &process, int &finishedProcesses) {
         readyQueue.push_back(&process);
         break;
     }
+}
+
+void Simulator::reclaimFinishedCores(std::vector<std::unique_ptr<CPUCore>> &cpuCores,
+                                     std::vector<PCB *> &coreAssignments,
+                                     std::queue<int> &idleCoresIdx,
+                                     int &finishedProcesses) {
+    for (std::size_t idx = 0; idx < cpuCores.size(); ++idx) {
+        PCB *assigned = coreAssignments[idx];
+        if (!assigned) {
+            continue;
+        }
+        if (!cpuCores[idx]->isIdle()) {
+            continue;
+        }
+
+        handleCompletion(*assigned, finishedProcesses);
+        coreAssignments[idx] = nullptr;
+        idleCoresIdx.push(static_cast<int>(idx));
+    }
+}
+
+bool Simulator::allCoresIdle(const std::vector<PCB *> &coreAssignments) const {
+    return std::all_of(coreAssignments.begin(), coreAssignments.end(), [](PCB *pcb) {
+        return pcb == nullptr;
+    });
 }
