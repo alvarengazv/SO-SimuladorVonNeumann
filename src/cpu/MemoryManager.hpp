@@ -9,8 +9,6 @@
 #include "cache/cache.hpp" // Incluir a cache
 #include "PCB.hpp" // Incluir o PCB para as métricas
 
-const size_t MAIN_MEMORY_SIZE = 1024;
-
 class MemoryManager {
 public:
     MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheCapacity);

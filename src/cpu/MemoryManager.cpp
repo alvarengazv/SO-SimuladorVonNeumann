@@ -7,6 +7,9 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
     L1_cache = std::make_unique<Cache>(cacheCapacity);
     mainMemoryLimit = mainMemorySize;
+
+    pageSizeBytes = SystemConfig::get().main_memory.page_size;
+    pageSizeWords = pageSizeBytes / sizeof(uint32_t);  
 }
 
 uint32_t MemoryManager::read(uint32_t address, PCB& process) {
