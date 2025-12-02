@@ -33,9 +33,9 @@ void ProcessScheduler::setQuantum()
 {
     for (int i = 0; i < this->process.size(); i++)
     {
-        int min_val = 10;
-        int max_val = 150;
-        unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+        int min_val = 5;
+        int max_val = 30;
+        unsigned seed = 42 + i; // Seed fixa para reprodutibilidade
         mt19937 rng(seed);
 
         uniform_int_distribution<int> dist(min_val, max_val);
@@ -52,7 +52,7 @@ void ProcessScheduler::setPriority()
     {
         int min_val = 0;
         int max_val = 5;
-        unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+        unsigned seed = 616 + i;
         mt19937 rng(seed);
 
         uniform_int_distribution<int> dist(min_val, max_val);
@@ -60,7 +60,6 @@ void ProcessScheduler::setPriority()
         int random_number = dist(rng);
 
         this->process.at(i)->priority = random_number;
-        this->process.at(i)->quantum = 2147483647;
     }
 }
 
