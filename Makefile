@@ -47,7 +47,7 @@ OBJ_BANK := $(SRC_BANK:.cpp=.o)
 # ==========================================
 
 # Make clean -> make -> make run
-all: clean $(TARGET) run
+all: $(TARGET) run
 
 # Regra para o programa principal
 $(TARGET): $(OBJ)
@@ -74,7 +74,7 @@ clean:
 	@echo "🧹 Limpando arquivos antigos (.o e executáveis)..."
 	@rm -f $(OBJ) $(OBJ_HASH) $(OBJ_BANK) $(TARGET) $(TARGET_HASH) $(TARGET_BANK)
 
-run:
+run: $(TARGET)
 	@echo "🚀 Executando o Simuador..."
 	@./$(TARGET)
 
