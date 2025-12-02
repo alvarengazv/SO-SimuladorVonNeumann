@@ -7,8 +7,8 @@
 Cache::Cache(size_t numLines, size_t lineSizeBytes)
     : numLines(numLines),
       lineSizeBytes(lineSizeBytes),
-      hits(0),
-      misses(0),
+      cache_hits(0),
+      cache_misses(0),
       currentPolicy(ReplacementPolicy::FIFO) {
 
     wordsPerBlock = lineSizeBytes / sizeof(unint32_t);
