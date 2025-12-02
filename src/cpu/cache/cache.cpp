@@ -12,22 +12,6 @@ Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
     for (size_t i = 0; i < capacity; ++i) {
         lines.emplace_back(wordsPerLine);
     }
-
-    // inicializa as políticas de substituição
-    if (currentPolicy == ReplacementPolicy::FIFO) {
-        for (size_t i = 0; i < capacity; ++i) {
-            fifoQueue.push(i);
-        }
-    } else if (currentPolicy == ReplacementPolicy::LRU) {
-        for (size_t i = 0; i < capacity; ++i) {
-            lruOrder.push_front(i);
-            lruPos[i] = std::prev(lruOrder.end());
-        }
-
-        for (auto it = lruOrder.begin(); it != lruOrder.end(); ++it) {
-            lruPos[*it] = it;
-        }
-    }
 }
 
 Cache::~Cache() {
@@ -174,25 +158,10 @@ void Cache::invalidate() {
 
     blockTagToLine.clear();
 
-    if (currentPolicy == ReplacementPolicy::FIFO) {
-        std::queue<size_t> empty;
-        std::swap(fifoQueue, empty);
-
-        for (size_t i = 0; i < capacity; ++i) {
-            fifoQueue.push(i);
-        }
-    } else if (currentPolicy == ReplacementPolicy::LRU) {
-        lruOrder.clear();
-        lruPos.clear();
-
-        for (size_t i = 0; i < capacity; ++i) {
-            lruOrder.push_front(i);
-        }
-
-        for (auto it = lruOrder.begin(); it != lruOrder.end(); ++it) {
-            lruPos[*it] = it;
-        }
-    }
+    // Limpa estruturas de política de substituição
+    fifoQueue = std::queue<size_t>();
+    lruOrder.clear();
+    lruPos.clear();
 }
 
 // Getters para hits e misses
@@ -208,6 +177,13 @@ int Cache::get_hits() {
 
 // Obtém o índice da linha a ser evictada conforme a política atual
 size_t Cache::getLineToEvict() {
+
+    for (size_t i = 0; i < capacity; ++i) {
+        if (!lines[i].valid) {
+            return i;
+        }
+    }
+
     size_t victimIndex;
 
     if (currentPolicy == ReplacementPolicy::FIFO) {
