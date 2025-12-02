@@ -660,7 +660,7 @@ void Control_Unit::FlushPipeline(ControlContext &context) {
 }
 
 // A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock) {
+void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId) {
     Control_Unit UC;
 
     std::atomic<bool> endProgram{false};
@@ -710,7 +710,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             issuedCycles.fetch_add(1, std::memory_order_relaxed);
             account_pipeline_cycle(process);
 
-            if (issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
+            if (schedulerId == 0 && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
                 endExecution.store(true, std::memory_order_relaxed);
                 break;
             }

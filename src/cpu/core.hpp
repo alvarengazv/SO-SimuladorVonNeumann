@@ -25,11 +25,12 @@ public:
     void start();
     void stop();
 
-    void submitProcess(PCB *process,
-                       bool printLockState = true);
+    void submitProcess(PCB *process, bool printLockState = true);
 
     bool isIdle() const;
     std::size_t id() const;
+
+    void setSchedulingAlgorithm(int algorithm);
 
 private:
     void workerLoop();
@@ -48,6 +49,7 @@ private:
     PCB *currentProcess{nullptr};
     bool currentPrintLock{true};
     std::vector<std::unique_ptr<IORequest>> ioRequestsBuffer;
+    int schedulingAlgorithm = 0;
 };
 
 #endif

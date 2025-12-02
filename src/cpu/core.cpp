@@ -95,7 +95,7 @@ void CPUCore::workerLoop() {
 
         ioRequestsBuffer.clear();
         std::atomic<bool> printLock(printLockState);
-        Core(memManager, *process, &ioRequestsBuffer, printLock);
+        Core(memManager, *process, &ioRequestsBuffer, printLock, schedulingAlgorithm);
 
         {
             std::lock_guard<std::mutex> lock(workMutex);
@@ -112,4 +112,8 @@ void CPUCore::resetCurrentProcess() {
     currentPrintLock = true;
     ioRequestsBuffer.clear();
     workCv.notify_all();
+}
+
+void CPUCore::setSchedulingAlgorithm(int algorithm) {
+    schedulingAlgorithm = algorithm;
 }

@@ -34,7 +34,7 @@ class MemoryManager;
 struct PCB;
 struct IORequest;
 
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock);
+void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId);
 
 struct ControlContext {
     hw::REGISTER_BANK &registers;
