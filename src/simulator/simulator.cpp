@@ -118,6 +118,7 @@ void Simulator::executeProcesses() {
     for (int i = 0; i < numCores; ++i) {
         cpuCores.push_back(std::make_unique<CPUCore>(i, memManager, ioManager));
         cpuCores.back()->start();
+        cpuCores.back()->setSchedulingAlgorithm(config.scheduling.algorithm);
         idleCoresIdx.push(i);
     }
 
@@ -153,10 +154,13 @@ void Simulator::executeProcesses() {
         coreAssignments[coreIdx] = currentProcess;
         cpuCores[coreIdx]->submitProcess(currentProcess);
         currentProcess->coresAssigned.push_back(coreIdx);
-        std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
-                  << " (Quantum: " << currentProcess->quantum
-                  << ") (Prioridade: " << currentProcess->priority << ")"
-                  << ") (Intruções: " << currentProcess->instructions << ").\n";
+        {
+            std::lock_guard<std::mutex> lock(printMutex);
+            std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
+                    << " (Quantum: " << currentProcess->quantum
+                    << ") (Prioridade: " << currentProcess->priority << ")"
+                    << ") (Intruções: " << currentProcess->instructions << ").\n";
+        }
     }
 
     reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
@@ -168,25 +172,37 @@ void Simulator::executeProcesses() {
 
 void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
     switch (process.state.load()) {
-    case State::Blocked:
-        std::cout << "[Scheduler] Processo " << process.pid
-                  << " bloqueado por I/O. Entregando ao IOManager.\n";
-        ioManager.registerProcessWaitingForIO(&process);
-        blockedQueue.push_back(&process);
-        break;
-
-    case State::Finished:
-        std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
-        print_metrics(process);
-        finishedProcesses++;
-        break;
-
-    default:
-        std::cout << "[Scheduler] Quantum do processo " << process.pid
-                  << " expirou. Voltando para a fila.\n";
-        process.state.store(State::Ready);
-        readyQueue.push_back(&process);
-        break;
+        case State::Blocked:{
+            std::lock_guard<std::mutex> lock(blockedQueueMutex);
+            {
+                std::lock_guard<std::mutex> lock(printMutex);
+                std::cout << "[Scheduler] Processo " << process.pid
+                        << " bloqueado por I/O. Entregando ao IOManager.\n";
+            }
+            ioManager.registerProcessWaitingForIO(&process);
+            blockedQueue.push_back(&process);
+            break;
+        }    
+        case State::Finished:{
+            {
+                std::lock_guard<std::mutex> lock(printMutex);
+                std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
+                print_metrics(process);
+            }
+            finishedProcesses++;
+            break;
+        }
+        default:{
+            {
+                std::lock_guard<std::mutex> lock(printMutex);
+                std::cout << "[Scheduler] Quantum do processo " << process.pid
+                        << " expirou. Voltando para a fila.\n";
+            }
+            std::lock_guard<std::mutex> lock(readyQueueMutex);
+            process.state.store(State::Ready);
+            readyQueue.push_back(&process);
+            break;
+        }
     }
 }
 

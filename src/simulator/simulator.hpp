@@ -55,6 +55,7 @@ private:
     std::vector<PCB *> blockedQueue;
     mutable std::mutex blockedQueueMutex;
     std::unique_ptr<ProcessScheduler> scheduler;
+    mutable std::mutex printMutex;
 };
 
 #endif // SIMULATOR_HPP
