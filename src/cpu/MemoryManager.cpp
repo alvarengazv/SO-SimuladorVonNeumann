@@ -2,15 +2,13 @@
 
 #include <iostream>
 
-MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheCapacity) {
+MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes) {
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
-    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes);
+    // Cria cache com política FIFO padrão
+    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes, ReplacementPolicy::FIFO);
 
     mainMemoryLimit = mainMemorySize;
-
-    pageSizeBytes = SystemConfig::get().main_memory.page_size;
-    pageSizeWords = pageSizeBytes / sizeof(uint32_t);  
 }
 
 uint32_t MemoryManager::read(uint32_t logicalAddress, PCB& process) {
@@ -18,10 +16,8 @@ uint32_t MemoryManager::read(uint32_t logicalAddress, PCB& process) {
     process.mem_accesses_total.fetch_add(1);
     process.mem_reads.fetch_add(1);
 
-    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
-
-    // 2. Tenta ler da cache L1 (por blocos)
-    uint32_t data = L1_cache->read(physicalAddress, this, process);
+    // A cache já trata o mapeamento lógico → físico internamente
+    uint32_t data = L1_cache->read(logicalAddress, this, process);
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 
@@ -33,28 +29,17 @@ void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB& process) 
     process.mem_accesses_total.fetch_add(1);
     process.mem_writes.fetch_add(1);
 
-    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
-
-    // 2. Escreve na cache L1 (write-back)
-    L1_cache->write(physicalAddress, data, this, process);
+    // A cache já trata o mapeamento lógico → físico internamente
+    L1_cache->write(logicalAddress, data, this, process);
+    std::cout << "Escrevendo na memória através da cache\n";
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 }
 
 uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB& process) {
-    size_t pageId = logicalAddress / pageSizeBytes;
-    size_t offset = logicalAddress % pageSizeBytes;
-
-    size_t frame;
-    if (!mainMemory->isPageLoaded(pageId)) {
-        // Page fault: carrega página da memória secundária
-        auto pageData = secondaryMemory->loadPage(pageId);
-        frame = mainMemory->loadPageIntoFrame(pageId, pageData);
-    } else {
-        frame = mainMemory->getFrameForPage(pageId);
-    }
-
-    return static_cast<uint32_t>(frame * pageSizeBytes + offset);
+    // Por enquanto, retorna o endereço lógico como físico (sem MMU)
+    // Implementar paging/segmentação conforme necessário
+    return logicalAddress;
 }
 
 void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy) {

@@ -1,161 +1,257 @@
 #include "cache.hpp"
-#include "cachePolicy.hpp"
-#include "../MemoryManager.hpp" // Necessário para a lógica de write-back
 
-#include <limits>
+Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
+        : capacity(numLines),
+        wordsPerLine(wordsPerLine),
+        cache_hits(0),
+        cache_misses(0),
+        currentPolicy(policy) {
+   
+    // Inicializa linhas da cache
+    lines.reserve(capacity);
+    for (size_t i = 0; i < capacity; ++i) {
+        lines.emplace_back(wordsPerLine);
+    }
 
-Cache::Cache(size_t numLines, size_t lineSizeBytes)
-    : numLines(numLines),
-      lineSizeBytes(lineSizeBytes),
-      cache_hits(0),
-      cache_misses(0),
-      currentPolicy(ReplacementPolicy::FIFO) {
+    // inicializa as políticas de substituição
+    if (currentPolicy == ReplacementPolicy::FIFO) {
+        for (size_t i = 0; i < capacity; ++i) {
+            fifoQueue.push(i);
+        }
+    } else if (currentPolicy == ReplacementPolicy::LRU) {
+        for (size_t i = 0; i < capacity; ++i) {
+            lruOrder.push_front(i);
+            lruPos[i] = std::prev(lruOrder.end());
+        }
 
-    wordsPerBlock = lineSizeBytes / sizeof(unint32_t);
-    lines.resize(numLines);
-
-    // inicializar todas as linhas como inválidas
-    for (auto& line : lines) {
-        line.valid = false;
-        line.dirty = false;
-        line.tag = 0;
-        line.blockData.resize(wordsPerBlock, 0);
+        for (auto it = lruOrder.begin(); it != lruOrder.end(); ++it) {
+            lruPos[*it] = it;
+        }
     }
 }
 
 Cache::~Cache() {
-    // Limpa linhas e estruturas auxiliares
-    lines.clear();
+   std::lock_guard<std::mutex> lock(cacheMutex);
+
+    // Limpa estruturas necessárias
+    lruPos.clear();
+    lruOrder.clear();
     fifoQueue = std::queue<size_t>();
-    lruList.clear();
-    lruPositions.clear();
+    blockTagToLine.clear();
+    lines.clear();
 }
 
+// Decodifica endereço em tag e offset, retornando struct AddressDecoded
+AddressDecoded Cache::decodeAddress(uint32_t address) const {
+    size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
 
-// Divide endereço em tag | index | offset
-void Cache::parseAddress(uint32_t address, uint32_t &tag, size_t &index, size_t &offset) const {
-    size_t blockNumber = address / lineSizeBytes;
-    index = blockNumber % numLines;
-    tag = blockNumber / numLines;
-    offset = (address % lineSizeBytes) / sizeof(uint32_t);
+    AddressDecoded info;
+
+    info.tag = address / blockSizeBytes;
+    info.wordOffset = (address % blockSizeBytes) / sizeof(uint32_t);
+
+    return info;
 }
 
 // Leitura da cache
 uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
     std::lock_guard<std::mutex> lock(cacheMutex);
 
-    uint32_t tag;
-    size_t index, offset;
-    parseAddress(address, tag, index, offset);
+    AddressDecoded info = decodeAddress(address);
 
-    CacheLine &line = lines[index];
-    if (line.valid && line.tag == tag) {
-        hits++;
+    auto it = blockTagToLine.find(info.tag);
+    if (it != blockTagToLine.end()) {
+        // HIT
+        cache_hits++;
+        size_t lineIndex = it->second;
 
-        // Atualiza LRU se necessário
-        if (currentPolicy == ReplacementPolicy::LRU) {
-            lruList.erase(lruPositions[index]);
-            lruList.push_front(index);
-            lruPositions[index] = lruList.begin();
-        }
+        updateReplacementPolicy(lineIndex);
+        return lines[lineIndex].data[info.wordOffset];
+    } else {
+        // MISS
+        cache_misses++;
 
-        return line.blockData[offset];
+        // Carrega o bloco da memória principal para a cache
+        size_t lineIndex = getLineToEvict();
+        evictLine(lineIndex, mem, process);
+        loadBlock(info.tag, lineIndex, mem, process);
+
+        return lines[lineIndex].data[info.wordOffset];
     }
-
-    // Cache miss
-    misses++;
-    loadBlock(address / lineSizeBytes, mem, process);
-    return lines[index].blockData[offset];
 }
 
 // Escrita da cache
 void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& process) {
     std::lock_guard<std::mutex> lock(cacheMutex);
 
-    uint32_t tag;
-    size_t index, offset;
-    parseAddress(address, tag, index, offset);
+    AddressDecoded info = decodeAddress(address);
 
-    CacheLine &line = lines[index];
-    if (!line.valid || line.tag != tag) {
-        // Write-allocate: carrega bloco antes de escrever
-        loadBlock(address / lineSizeBytes, mem, process);
-        line = lines[index];
+    auto it = blockTagToLine.find(info.tag);
+    size_t lineIndex;
+
+    if (it != blockTagToLine.end()) {
+        // HIT
+        cache_hits++;
+        lineIndex = it->second;
+
+        updateReplacementPolicy(lineIndex);
+    } else {
+        // MISS → write-allocate
+        cache_misses++;
+
+        // Carrega o bloco da memória principal para a cache
+        lineIndex = getLineToEvict();
+        evictLine(lineIndex, mem, process);
+        loadBlock(info.tag, lineIndex, mem, process);
     }
 
-    line.blockData[offset] = data;
-    line.dirty = true;
+    lines[lineIndex].data[info.wordOffset] = data;
 
-    // Atualiza LRU se necessário
-    if (currentPolicy == ReplacementPolicy::LRU) {
-        lruList.erase(lruPositions[index]);
-        lruList.push_front(index);
-        lruPositions[index] = lruList.begin();
-    }
+    lines[lineIndex].dirty = true;
 }
 
 // Carrega um bloco da memória principal para a cache
-void Cache::loadBlock(size_t blockId, MemoryManager* mem, PCB& process) {
-    size_t index = blockId % numLines;
-    CacheLine &line = lines[index];
+void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB& process) {
+    CacheLine& line = lines[lineIndex];
 
-    // Se linha atual é dirty, escreve de volta
-    if (line.valid && line.dirty) {
-        for (size_t i = 0; i < wordsPerBlock; ++i) {
-            mem->writeToFile((line.tag * numLines + index) * wordsPerBlock + i, line.blockData[i], process);
-        }
+    size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
+    uint32_t baseAddress = blockTag * blockSizeBytes;
+
+    for (size_t i = 0; i < wordsPerLine; i++) {
+        uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
+        line.data[i] = mem->read(wordAddress, process);
     }
 
-    // Atualiza a linha com novo bloco
-    line.tag = blockId / numLines;
+    line.tag = blockTag;
     line.valid = true;
     line.dirty = false;
 
-    // Lê bloco inteiro da memória
-    line.blockData.resize(wordsPerBlock);
-    for (size_t i = 0; i < wordsPerBlock; ++i) {
-        line.blockData[i] = mem->readFromFile(blockId * wordsPerBlock + i, process);
-    }
+    // Atualiza mapeamento bloco → linha
+    blockTagToLine[blockTag] = lineIndex;
 
-    // Atualiza estruturas de substituição
+    // Atualiza política de substituição
+    updateReplacementPolicy(lineIndex);
+
     if (currentPolicy == ReplacementPolicy::FIFO) {
-        // Remove se já estiver na fila (simula reinserção)
-        std::queue<size_t> newQueue;
-        while (!fifoQueue.empty()) {
-            size_t idx = fifoQueue.front(); fifoQueue.pop();
-            if (idx != index) newQueue.push(idx);
-        }
-        fifoQueue = newQueue;
-        fifoQueue.push(index);
-    } else { // LRU
-        lruList.remove(index);
-        lruList.push_front(index);
-        lruPositions[index] = lruList.begin();
+        fifoQueue.push(lineIndex);
     }
 }
 
 // Força escrita do bloco se dirty
 void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
-    CacheLine &line = lines[lineIndex];
+    CacheLine& line = lines[lineIndex];
+
     if (line.valid && line.dirty) {
-        for (size_t i = 0; i < wordsPerBlock; ++i) {
-            mem->writeToFile((line.tag * numLines + lineIndex) * wordsPerBlock + i, line.blockData[i], process);
+        size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
+        uint32_t baseAddress = line.tag * blockSizeBytes;
+
+        for (size_t i = 0; i < wordsPerLine; ++i) {
+            uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
+            mem->writeToFile(wordAddress, line.data[i], process);
         }
     }
+
+    if (line.valid) {
+        blockTagToLine.erase(line.tag);
+    }
+
     line.valid = false;
     line.dirty = false;
+    line.tag = 0;
 }
 
-int Cache::get_misses(){
-       // Retorna o número de cache misses
+// Invalida toda a cache
+void Cache::invalidate() {
+    std::lock_guard<std::mutex> lock(cacheMutex);
+
+    for (size_t i = 0; i < capacity; ++i) {
+        CacheLine& line = lines[i];
+
+        line.valid = false;
+        line.dirty = false;
+        line.tag = 0;
+    }
+
+    blockTagToLine.clear();
+
+    if (currentPolicy == ReplacementPolicy::FIFO) {
+        std::queue<size_t> empty;
+        std::swap(fifoQueue, empty);
+
+        for (size_t i = 0; i < capacity; ++i) {
+            fifoQueue.push(i);
+        }
+    } else if (currentPolicy == ReplacementPolicy::LRU) {
+        lruOrder.clear();
+        lruPos.clear();
+
+        for (size_t i = 0; i < capacity; ++i) {
+            lruOrder.push_front(i);
+        }
+
+        for (auto it = lruOrder.begin(); it != lruOrder.end(); ++it) {
+            lruPos[*it] = it;
+        }
+    }
+}
+
+// Getters para hits e misses
+int Cache::get_misses() {
+    // Retorna o número de cache misses
     return cache_misses;
 }
 
-int Cache::get_hits(){
-       // Retorna o número de cache hits
+int Cache::get_hits() {
+    // Retorna o número de cache hits
     return cache_hits;
 }
 
+// Obtém o índice da linha a ser evictada conforme a política atual
+size_t Cache::getLineToEvict() {
+    size_t victimIndex;
+
+    if (currentPolicy == ReplacementPolicy::FIFO) {
+        // A CachePolicy remove da fila e retorna o índice
+        victimIndex = policyHandler.getAddressToReplace(fifoQueue);
+        
+        // Verificação de segurança (caso a fila estivesse vazia, retornaria max)
+        if (victimIndex == std::numeric_limits<size_t>::max()) {
+            throw std::runtime_error("Erro: Tentativa de evict em fila FIFO vazia.");
+        }
+
+    } else { // LRU
+        // A CachePolicy remove do final da lista (back) e retorna o índice
+        victimIndex = policyHandler.getAddressToReplace(lruOrder);
+
+        if (victimIndex == std::numeric_limits<size_t>::max()) {
+             throw std::runtime_error("Erro: Tentativa de evict em lista LRU vazia.");
+        }
+        
+        // Removemos do mapa auxiliar de iteradores, pois ele saiu da lista
+        lruPos.erase(victimIndex);
+    }
+
+    return victimIndex;
+}
+
+// Atualiza estruturas da política de substituição após acesso
+void Cache::updateReplacementPolicy(size_t lineIndex) {
+    if (currentPolicy == ReplacementPolicy::FIFO) {
+        return;  // FIFO não requer atualização no acesso
+    } else if (currentPolicy == ReplacementPolicy::LRU) {
+        // Se a linha já está na lista, removemos sua posição antiga
+        auto it = lruPos.find(lineIndex);
+        if (it != lruPos.end()) {
+            lruOrder.erase(it->second);
+        }
+
+        // Adicionamos a linha no início da lista (mais recentemente usada)
+        lruOrder.push_front(lineIndex);
+        lruPos[lineIndex] = lruOrder.begin();
+    }
+}
+
+// Set e get para a política de substituição
 void Cache::setReplacementPolicy(ReplacementPolicy policy) {
     if (currentPolicy == policy) {
         return;
@@ -164,35 +260,9 @@ void Cache::setReplacementPolicy(ReplacementPolicy policy) {
     currentPolicy = policy;
 
     // Limpa e reinicia as estruturas auxiliares para evitar rastros da política anterior
-    fifoQueue = std::queue<size_t>();
-    lruOrder.clear();
-    lruPositions.clear();
-
-    for (size_t i = 0; i < lines.size(); ++i) {
-        if (!lines[i].valid) continue;
-        if (currentPolicy == ReplacementPolicy::FIFO) {
-            fifoQueue.push(i);
-        } else {
-            lruList.push_front(i);
-            lruPositions[i] = lruList.begin();
-        }
-    }
+    invalidate();
 }
 
 ReplacementPolicy Cache::getReplacementPolicy() const {
     return currentPolicy;
-}
-
-void Cache::invalidate() {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    
-    for (auto &line : lines) {
-        line.valid = false;
-        line.dirty = false;
-    }
-
-    // Limpar as estruturas auxiliares também, pois a cache foi invalidada
-    fifoQueue = std::queue<size_t>();
-    lruOrder.clear();
-    lruPositions.clear();
 }

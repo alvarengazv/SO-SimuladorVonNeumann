@@ -6,8 +6,17 @@
 #include <mutex>
 #include "../memory/MAIN_MEMORY.hpp"
 #include "../memory/SECONDARY_MEMORY.hpp"
-#include "cache/cache.hpp" // Incluir a cache
-#include "PCB.hpp" // Incluir o PCB para as métricas
+#include "cache/cache.hpp"
+#include "PCB.hpp"
+
+// Forward declarations para evitar ciclo de includes
+class PCB;
+class Cache;
+
+enum class ReplacementPolicy {
+    FIFO,
+    LRU
+};
 
 class MemoryManager {
 public:
