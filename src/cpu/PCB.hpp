@@ -31,7 +31,7 @@ struct MemWeights {
 
 struct PCB {
     int pid = 0;
-    int coreAssigned = -1;
+    std::vector<int> coresAssigned;
     std::string name;
     int quantum = 0;
     int timeStamp = 0;

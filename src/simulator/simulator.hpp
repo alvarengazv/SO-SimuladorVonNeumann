@@ -5,12 +5,25 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <iostream>
+#include <thread>
+#include <atomic>
+#include <queue>
+#include <ctime>
 
+#include "../cpu/CONTROL_UNIT.hpp"
+#include "../cpu/pcb_loader.hpp"
+#include "../metrics/metrics.hpp"
+#include "../parser_json/parser_json.hpp"
 #include "../system_config/system_config.hpp"
 #include "../cpu/MemoryManager.hpp"
 #include "../IO/IOManager.hpp"
 #include "../cpu/PCB.hpp"
 #include "../process_scheduler/process_scheduler.hpp"
+#include "../cpu/core.hpp"
 
 class Simulator {
 public:
@@ -24,7 +37,13 @@ private:
                                const std::string &taskFile,
                                uint32_t baseAddress = 0);
     void moveUnblockedProcesses();
-    void executeProcess(PCB &process, int &finishedProcesses);
+    void executeProcesses();
+    void handleCompletion(PCB &process, int &finishedProcesses);
+    void reclaimFinishedCores(std::vector<std::unique_ptr<CPUCore>> &cpuCores,
+                              std::vector<PCB *> &coreAssignments,
+                              std::queue<int> &idleCoresIdx,
+                              int &finishedProcesses);
+    bool allCoresIdle(const std::vector<PCB *> &coreAssignments) const;
 
     SystemConfig config;
     MemoryManager memManager;
@@ -32,8 +51,11 @@ private:
 
     std::vector<std::unique_ptr<PCB>> processList;
     std::vector<PCB *> readyQueue;
+    mutable std::mutex readyQueueMutex;
     std::vector<PCB *> blockedQueue;
+    mutable std::mutex blockedQueueMutex;
     std::unique_ptr<ProcessScheduler> scheduler;
+    mutable std::mutex printMutex;
 };
 
 #endif // SIMULATOR_HPP

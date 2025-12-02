@@ -1,6 +1,8 @@
 #include "metrics.hpp"
 
 void print_metrics(const PCB &pcb) {
+    auto programOutput = pcb.snapshotProgramOutput();
+    
     std::cout << "\n--- METRICAS FINAIS DO PROCESSO " << pcb.pid << " ---\n";
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
     std::cout << "Estado Final:           "
@@ -18,7 +20,20 @@ void print_metrics(const PCB &pcb) {
     std::cout << "Acessos a Mem Secundaria:" << pcb.secondary_mem_accesses.load() << "\n";
     std::cout << "Ciclos Totais de Memoria: " << pcb.memory_cycles.load() << "\n";
     std::cout << "Tempo Total de Execução:  " << pcb.totalTimeExecution() << "\n";
-    std::cout << "------------------------------------------\n";
+    std::cout << "Cores Utilizados:        ";
+    for (const auto& core : pcb.coresAssigned) {
+        std::cout << core << " ";
+    }
+    std::cout << "\nSaída do Programa:\n";
+    
+    if (programOutput.empty()) {
+        std::cout << "  (Sem saída registrada)\n";
+    } else {
+        for (const auto &line : programOutput) {
+            std::cout << "  -> " << line << "\n";
+        }
+    }
+    std::cout << "\n------------------------------------------\n";
     // cria pasta "output" se não existir
     std::filesystem::create_directory("output");
 
@@ -28,8 +43,6 @@ void print_metrics(const PCB &pcb) {
     auto fileNeedsHeader = [](const std::string &path) {
         return !std::filesystem::exists(path) || std::filesystem::file_size(path) == 0;
     };
-
-    auto programOutput = pcb.snapshotProgramOutput();
 
     std::ofstream resultados(resultadosPath, std::ios::app);
     if (resultados.is_open())
@@ -44,6 +57,11 @@ void print_metrics(const PCB &pcb) {
         resultados << "Cache Hits: " << pcb.cache_hits << " | Cache Misses: " << pcb.cache_misses << "\n";
         resultados << "Ciclos de IO: " << pcb.io_cycles << "\n";
         resultados << "Tempo Total de Execução: " << pcb.totalTimeExecution() << "\n";
+        resultados << "Cores Utilizados: ";
+        for (const auto& core : pcb.coresAssigned) {
+            resultados << core << " ";
+        }
+        resultados << "\n";
         resultados << "Saída do Programa:\n";
         if (programOutput.empty()) {
             resultados << "  (Sem saída registrada)\n";
