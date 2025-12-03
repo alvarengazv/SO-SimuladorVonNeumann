@@ -103,7 +103,7 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
 
     for (size_t i = 0; i < wordsPerLine; i++) {
         uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-        line.data[i] = mem->read(wordAddress, process);
+        line.data[i] = mem->readFromPhysical(wordAddress, process);
     }
 
     line.tag = blockTag;
