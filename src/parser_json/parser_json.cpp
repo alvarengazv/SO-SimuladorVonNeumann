@@ -230,13 +230,13 @@ int parseData(const json &dataJson, MemoryManager &memManager, PCB& pcb, int sta
                 for (auto &e : val){
                     int w = e.is_string()? static_cast<int>(std::stoul(e.get<string>(),nullptr,0))
                                           : e.get<int>();
-                    memManager.write(addr, w, pcb); // Alterado aqui
+                    memManager.loadProcessData(addr, w, pcb); // Alterado aqui
                     addr += 4;
                 }
             } else {
                 int w = val.is_string()? static_cast<int>(std::stoul(val.get<string>(),nullptr,0))
                                         : val.get<int>();
-                memManager.write(addr, w, pcb); // Alterado aqui
+                memManager.loadProcessData(addr, w, pcb); // Alterado aqui
                 addr += 4;
             }
         }
@@ -318,7 +318,7 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
         
         uint32_t binary_instruction = parseInstruction(node, current_instruction_addr);
         
-        memManager.write(current_mem_addr, binary_instruction, pcb); // Alterado aqui
+        memManager.loadProcessData(current_mem_addr, binary_instruction, pcb); // Alterado aqui
         
         current_mem_addr += 4;
         current_instruction_addr++;

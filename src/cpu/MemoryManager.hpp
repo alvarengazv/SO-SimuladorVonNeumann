@@ -14,19 +14,26 @@
 class PCB;
 class Cache;
 
-
-class MemoryManager {
+class MemoryManager
+{
 public:
-    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes);
+    size_t pageSize;
+    size_t totalFrames;
+    std::vector<bool> framesBitmap;
+
+    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize);
 
     // Métodos unificados agora recebem o PCB para as métricas
-    uint32_t read(uint32_t LogicalAddress, PCB& process);
-    void write(uint32_t LogicalAddress, uint32_t data, PCB& process);
+    uint32_t read(uint32_t LogicalAddress, PCB &process);
+    void write(uint32_t LogicalAddress, uint32_t data, PCB &process);
+    void loadProcessData(uint32_t logicalAddress, uint32_t data, PCB &process);
 
     void setCacheReplacementPolicy(ReplacementPolicy policy);
-    
+
     // Função auxiliar para o write-back da cache
-    void writeToFile(uint32_t address, uint32_t data, PCB& process);
+    void writeToPhysical(uint32_t address, uint32_t data, PCB &process);
+
+    uint32_t readFromPhysical(uint32_t logicalAddress, PCB &process);
 
 private:
     std::unique_ptr<MAIN_MEMORY> mainMemory;
@@ -36,8 +43,8 @@ private:
     size_t mainMemoryLimit;
     mutable std::recursive_mutex memoryMutex;
 
-    
-    uint32_t translateLogicalToPhysical(uint32_t logicalAddress, PCB& process);
+    uint32_t translateLogicalToPhysical(uint32_t logicalAddress, PCB &process);
+    int allocateFreeFrame();
 };
 
 #endif // MEMORY_MANAGER_HPP

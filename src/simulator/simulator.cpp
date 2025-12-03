@@ -19,7 +19,7 @@ std::string schedulerName(int algorithm) {
 
 Simulator::Simulator(const std::string &configPath)
     : config(SystemConfig::loadFromFile(configPath)),
-      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size,config.cache.line_size),
+      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size,config.cache.line_size,config.main_memory.page_size),
       ioManager() {}
 
 int Simulator::run() {
@@ -50,21 +50,20 @@ bool Simulator::loadProcesses() {
         std::string pcbFile;
         std::string taskLabel;
         std::string taskFile;
-        uint32_t baseAddress;
     };
 
     const std::vector<ProcessDefinition> definitions = {
-        {"src/pcbs/process1.json", "tasks.json", "src/tasks/tasks.json", 0x00000000},
-        {"src/pcbs/process2.json", "tasks_counter.json", "src/tasks/tasks_counter.json", 0x00000100},
-        {"src/pcbs/process3.json", "tasks_io.json", "src/tasks/tasks_io.json", 0x00000200},
-        {"src/pcbs/process_forward.json", "tasks_forward.json", "src/tasks/tasks_forward.json", 0x00000300}};
+        {"src/pcbs/process1.json", "tasks.json", "src/tasks/tasks.json" },
+        {"src/pcbs/process2.json", "tasks_counter.json", "src/tasks/tasks_counter.json" },
+        {"src/pcbs/process3.json", "tasks_io.json", "src/tasks/tasks_io.json" },
+        {"src/pcbs/process_forward.json", "tasks_forward.json", "src/tasks/tasks_forward.json" }};
 
     bool allLoaded = true;
     for (const auto &definition : definitions) {
         allLoaded &= loadProcessDefinition(definition.pcbFile,
                            definition.taskLabel,
                            definition.taskFile,
-                           definition.baseAddress);
+                          0x00000000 );
     }
     return allLoaded;
 }

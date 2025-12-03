@@ -61,7 +61,7 @@ class Cache {
     int cache_hits;
     int cache_misses;
 
-    mutable std::mutex cacheMutex;
+    mutable std::recursive_mutex cacheMutex;
 
     size_t getLineToEvict();
     void updateReplacementPolicy(size_t lineIndex);

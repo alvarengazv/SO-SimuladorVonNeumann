@@ -15,7 +15,7 @@ Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
 }
 
 Cache::~Cache() {
-   std::lock_guard<std::mutex> lock(cacheMutex);
+   std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     // Limpa estruturas necessárias
     lruPos.clear();
@@ -39,7 +39,7 @@ AddressDecoded Cache::decodeAddress(uint32_t address) const {
 
 // Leitura da cache
 uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     AddressDecoded info = decodeAddress(address);
 
@@ -66,7 +66,7 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
 
 // Escrita da cache
 void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& process) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     AddressDecoded info = decodeAddress(address);
 
@@ -131,7 +131,7 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
         for (size_t i = 0; i < wordsPerLine; ++i) {
             uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-            mem->writeToFile(wordAddress, line.data[i], process);
+            mem->writeToPhysical(wordAddress, line.data[i], process);
         }
     }
 
@@ -146,7 +146,7 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
 // Invalida toda a cache
 void Cache::invalidate() {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     for (size_t i = 0; i < capacity; ++i) {
         CacheLine& line = lines[i];

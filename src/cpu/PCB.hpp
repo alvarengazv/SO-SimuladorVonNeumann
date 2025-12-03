@@ -29,6 +29,12 @@ struct MemWeights {
     uint64_t secondary = 10; // custo por acesso à memória secundária
 };
 
+struct PageTableEntry {
+    uint32_t frameNumber; 
+    bool valid;           
+    bool dirty;          
+};
+
 struct PCB {
     int pid = 0;
     std::vector<int> coresAssigned;
@@ -59,6 +65,8 @@ struct PCB {
     std::atomic<uint64_t> cache_hits{0};
     std::atomic<uint64_t> cache_misses{0};
     std::atomic<uint64_t> io_cycles{1};
+
+    std::unordered_map<uint32_t, PageTableEntry> pageTable;
 
     MemWeights memWeights;
 

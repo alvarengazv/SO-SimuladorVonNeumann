@@ -2,7 +2,11 @@
 
 #include <iostream>
 
-MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes) {
+MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize)
+{
+    this->pageSize = pageSize;
+    this->totalFrames = mainMemorySize / pageSize;
+    this->framesBitmap.resize(totalFrames, false);
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
     // Cria cache com política FIFO padrão
@@ -11,7 +15,8 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
     mainMemoryLimit = mainMemorySize;
 }
 
-uint32_t MemoryManager::read(uint32_t logicalAddress, PCB& process) {
+uint32_t MemoryManager::read(uint32_t logicalAddress, PCB &process)
+{
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     process.mem_accesses_total.fetch_add(1);
     process.mem_reads.fetch_add(1);
@@ -24,40 +29,130 @@ uint32_t MemoryManager::read(uint32_t logicalAddress, PCB& process) {
     return data;
 }
 
-void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB& process) {
+void MemoryManager::loadProcessData(uint32_t logicalAddress, uint32_t data, PCB &process)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    mainMemory->WriteMem(physicalAddress, data);
+
+    process.primary_mem_accesses.fetch_add(1);
+}
+
+void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB &process)
+{
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     process.mem_accesses_total.fetch_add(1);
     process.mem_writes.fetch_add(1);
 
-    // A cache já trata o mapeamento lógico → físico internamente
     L1_cache->write(logicalAddress, data, this, process);
     std::cout << "Escrevendo na memória através da cache\n";
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 }
 
-uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB& process) {
-    // Por enquanto, retorna o endereço lógico como físico (sem MMU)
-    // Implementar paging/segmentação conforme necessário
-    return logicalAddress;
+int MemoryManager::allocateFreeFrame()
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    for (size_t i = 0; i < framesBitmap.size(); ++i)
+    {
+        if (!framesBitmap[i])
+        {
+            framesBitmap[i] = true;
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
 }
 
-void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy) {
+uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB &process)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    uint32_t pageNumber = logicalAddress / this->pageSize;
+    uint32_t offset = logicalAddress % this->pageSize;
+
+    auto it = process.pageTable.find(pageNumber);
+
+    bool pageFault = (it == process.pageTable.end()) || (!it->second.valid);
+
+    if (pageFault)
+    {
+        int freeFrame = allocateFreeFrame();
+
+        if (freeFrame == -1)
+        {
+            throw std::runtime_error("Out of Memory - Swap not implemented");
+
+            // implementar swap aqui
+        }
+
+        PageTableEntry newEntry;
+        newEntry.frameNumber = static_cast<uint32_t>(freeFrame);
+        newEntry.valid = true;
+        newEntry.dirty = false;
+
+        process.pageTable[pageNumber] = newEntry;
+
+        process.secondary_mem_accesses.fetch_add(1);
+        process.memory_cycles.fetch_add(process.memWeights.secondary);
+    }
+
+    uint32_t physicalFrame = process.pageTable[pageNumber].frameNumber;
+    uint32_t physicalAddress = (physicalFrame * this->pageSize) + offset;
+
+    if (physicalAddress >= mainMemoryLimit)
+    {
+        throw std::runtime_error("Segmentation Fault: Endereço físico calculado fora dos limites da RAM");
+    }
+
+    return physicalAddress;
+}
+
+void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy)
+{
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     L1_cache->setReplacementPolicy(policy);
 }
 
 // Função chamada pela cache para write-back
-void MemoryManager::writeToFile(uint32_t physicalAddress, uint32_t data, PCB& process) {
+void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB &process)
+{
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
 
-    if (physicalAddress < mainMemoryLimit) {
+    if (physicalAddress < mainMemoryLimit)
+    {
         mainMemory->WriteMem(physicalAddress, data);
         process.primary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.primary);
-    } else {
+    }
+    else
+    {
         uint32_t secondaryAddress = physicalAddress - mainMemoryLimit;
         secondaryMemory->WriteMem(secondaryAddress, data);
+        process.secondary_mem_accesses.fetch_add(1);
+        process.memory_cycles.fetch_add(process.memWeights.secondary);
+    }
+}
+
+uint32_t MemoryManager::readFromPhysical(uint32_t logicalAddress, PCB &process)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress,process);
+
+    if (physicalAddress < mainMemoryLimit)
+    {
+        mainMemory->ReadMem(physicalAddress);
+        process.primary_mem_accesses.fetch_add(1);
+        process.memory_cycles.fetch_add(process.memWeights.primary);
+    }
+    else
+    {
+        uint32_t secondaryAddress = physicalAddress - mainMemoryLimit;
+        secondaryMemory->ReadMem(secondaryAddress);
         process.secondary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
