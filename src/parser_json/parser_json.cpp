@@ -206,8 +206,11 @@ uint32_t encodeJType(const json &j){
 
 uint32_t parseInstruction(const json &instrJson, int currentInstrIndex){
     const string mnem = instrJson.at("instruction").get<string>();
-    if (mnem=="end" || mnem=="print")
+    if (mnem=="end")
         return static_cast<uint32_t>(getOpcode(mnem)) << 26;
+
+    if (mnem=="print")
+        return encodePrintInstruction(instrJson);
 
     if (functMap.count(mnem))              return encodeRType(instrJson);
     if (mnem=="j" || mnem=="jal")          return encodeJType(instrJson);
@@ -343,4 +346,39 @@ int loadJsonProgram(const string &filename, MemoryManager &memManager, PCB& pcb,
     if (j.contains("program")) 
         addr = parseProgram(j["program"], memManager, pcb, addr);
     return codeStart;
+}
+
+uint32_t encodePrintInstruction(const json &j) {
+    const int opcode = getOpcode("print");
+    int rs = 0;
+    int rt = 0;
+    int16_t imm = 0;
+
+    if (j.contains("rt")) {
+        rt = getRegisterCode(j.at("rt").get<string>());
+    }
+
+    if (j.contains("addr")) {
+        auto pr = parseOffsetBase(j.at("addr").get<string>());
+        imm = pr.first;
+        rs = pr.second;
+    } else if (j.contains("baseReg")) {
+        rs = getRegisterCode(j.at("baseReg").get<string>());
+        imm = j.contains("offset") ? parseImmediate(j.at("offset")) : 0;
+    } else if (j.contains("rs")) {
+        rs = getRegisterCode(j.at("rs").get<string>());
+        imm = j.contains("immediate") ? parseImmediate(j.at("immediate")) : 0;
+    } else if (j.contains("base")) {
+        const string lbl = j.at("base").get<string>();
+        if (!dataMap.count(lbl)) {
+            throw runtime_error("Label de dados desconhecida em PRINT: " + lbl);
+        }
+        imm = static_cast<int16_t>(dataMap[lbl] & 0xFFFF);
+    } else if (j.contains("address")) {
+        imm = parseImmediate(j.at("address"));
+    } else if (j.contains("immediate")) {
+        imm = parseImmediate(j.at("immediate"));
+    }
+
+    return buildBinaryInstruction(opcode, rs, rt, 0, 0, 0, imm, 0);
 }
