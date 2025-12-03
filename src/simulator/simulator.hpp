@@ -48,7 +48,6 @@ private:
 
     SystemConfig config;
     MemoryManager memManager;
-    IOManager ioManager;
 
     std::vector<std::unique_ptr<PCB>> processList;
     std::vector<PCB *> readyQueue;
@@ -57,6 +56,7 @@ private:
     mutable std::mutex blockedQueueMutex;
     std::unique_ptr<ProcessScheduler> scheduler;
     mutable std::mutex printMutex;
+    IOManager ioManager;
 };
 
 #endif // SIMULATOR_HPP

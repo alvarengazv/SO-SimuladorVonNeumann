@@ -142,19 +142,44 @@ uint32_t MemoryManager::readFromPhysical(uint32_t logicalAddress, PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
 
-    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress,process);
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+    uint32_t data = MEMORY_ACCESS_ERROR;
 
     if (physicalAddress < mainMemoryLimit)
     {
-        mainMemory->ReadMem(physicalAddress);
+        data = mainMemory->ReadMem(physicalAddress);
         process.primary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.primary);
     }
     else
     {
         uint32_t secondaryAddress = physicalAddress - mainMemoryLimit;
-        secondaryMemory->ReadMem(secondaryAddress);
+        data = secondaryMemory->ReadMem(secondaryAddress);
         process.secondary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
+    }
+
+    return data;
+}
+
+void MemoryManager::freeProcessPages(PCB &process)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    for (auto &entry : process.pageTable)
+    {
+        if (!entry.second.valid)
+        {
+            continue;
+        }
+
+        uint32_t frameNumber = entry.second.frameNumber;
+
+        if (frameNumber < framesBitmap.size())
+        {
+            framesBitmap[frameNumber] = false;
+        }
+
+        entry.second.valid = false;
     }
 }
