@@ -117,7 +117,7 @@ void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy)
     L1_cache->setReplacementPolicy(policy);
 }
 
-// Função chamada pela cache para write-back
+// Função chamada pela cache para write-back, ou seja, escrita na memória física diretamente
 void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
@@ -137,6 +137,7 @@ void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB
     }
 }
 
+// Função chamada pela cache para read, ou seja, leitura na memória física diretamente
 uint32_t MemoryManager::readFromPhysical(uint32_t logicalAddress, PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
