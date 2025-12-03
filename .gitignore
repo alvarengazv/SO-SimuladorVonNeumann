@@ -2,6 +2,7 @@
 *.o
 build/
 src/simulador
+src/simulador.exe
 
 # Arquivos do VS Code
 .vscode/
