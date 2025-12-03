@@ -6,6 +6,7 @@
 #include <mutex>
 #include "../memory/MAIN_MEMORY.hpp"
 #include "../memory/SECONDARY_MEMORY.hpp"
+#include "../memory/replacement_police.hpp"
 #include "cache/cache.hpp"
 #include "PCB.hpp"
 
@@ -13,10 +14,6 @@
 class PCB;
 class Cache;
 
-enum class ReplacementPolicy {
-    FIFO,
-    LRU
-};
 
 class MemoryManager {
 public:

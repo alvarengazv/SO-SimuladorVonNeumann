@@ -11,17 +11,13 @@
 #include <vector>
 
 #include "../MemoryManager.hpp"
+#include "../../memory/replacement_police.hpp"
 #include "cachePolicy.hpp"
 #include "../PCB.hpp"
 
 // Forward declarations para evitar ciclo de includes
 class MemoryManager;
 class PCB;
-
-enum class ReplacementPolicy {
-    FIFO,
-    LRU
-};
 
 struct AddressDecoded {
     size_t tag;         // Qual bloco é?

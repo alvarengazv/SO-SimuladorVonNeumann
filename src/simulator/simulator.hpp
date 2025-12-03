@@ -22,6 +22,7 @@
 #include "../cpu/MemoryManager.hpp"
 #include "../IO/IOManager.hpp"
 #include "../cpu/PCB.hpp"
+#include "../memory/replacement_police.hpp"
 #include "../process_scheduler/process_scheduler.hpp"
 #include "../cpu/core.hpp"
 

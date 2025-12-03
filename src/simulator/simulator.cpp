@@ -19,7 +19,7 @@ std::string schedulerName(int algorithm) {
 
 Simulator::Simulator(const std::string &configPath)
     : config(SystemConfig::loadFromFile(configPath)),
-      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size),
+      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size,config.cache.line_size),
       ioManager() {}
 
 int Simulator::run() {
@@ -27,7 +27,7 @@ int Simulator::run() {
     if (!loadProcesses()) {
         return 1;
     }
-    memManager.setCacheReplacementPolicy(config.cache.policy); //onde vai chamar pra trocar a politica de substituição da cache
+    memManager.setCacheReplacementPolicy(static_cast<ReplacementPolicy>(config.cache.policy)); //onde vai chamar pra trocar a politica de substituição da cache
     scheduler = std::make_unique<ProcessScheduler>(config.scheduling.algorithm, readyQueue);
 
     std::cout << "\nIniciando escalonador " << schedulerName(config.scheduling.algorithm) << "...\n";
