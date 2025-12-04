@@ -4,6 +4,7 @@
 #include <mutex>
 #include <string>
 #include <condition_variable>
+#include <cstdint>
 
 using namespace std;
 
@@ -24,6 +25,7 @@ struct Instruction_Data {
     int32_t aluResult = 0;
     bool pendingMemoryRead = false;
     bool pendingMemoryWrite = false;
+    uint32_t instructionAddress = 0;
     bool hasEffectiveAddress = false;
     uint32_t effectiveAddress = 0;
     int32_t loadResult = 0;
@@ -34,9 +36,17 @@ struct Instruction_Data {
 struct PipelineToken {
     Instruction_Data *entry = nullptr;
     uint32_t instruction = 0;
+    uint32_t pc = 0;
     bool valid = false;
     bool terminate = false;
     bool programEnded = false;
+    
+    // Cycle tracking for metrics
+    uint64_t fetchCycle = 0;      // Cycle when instruction was fetched
+    uint64_t decodeCycle = 0;     // Cycle when instruction was decoded
+    uint64_t executeCycle = 0;    // Cycle when instruction was executed
+    uint64_t memoryCycle = 0;     // Cycle when memory access completed
+    uint64_t writebackCycle = 0;  // Cycle when writeback completed
 };
 
 class PipelineRegister {
@@ -46,6 +56,7 @@ public:
     void flush();
     void stop();
     bool empty() const;
+    void reset();  // Reset for new run
 
 private:
     mutable std::mutex mutex_;

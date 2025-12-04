@@ -25,6 +25,9 @@ bool PipelineRegister::pop(PipelineToken &out) {
 
 void PipelineRegister::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (hasToken_ && stored_.terminate) {
+        return;
+    }
     hasToken_ = false;
     stored_ = PipelineToken{};
     cv_.notify_all();
@@ -41,4 +44,12 @@ void PipelineRegister::stop() {
 bool PipelineRegister::empty() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return !hasToken_;
+}
+
+void PipelineRegister::reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stopped_ = false;
+    hasToken_ = false;
+    stored_ = PipelineToken{};
+    cv_.notify_all();
 }

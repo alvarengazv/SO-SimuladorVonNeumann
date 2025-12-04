@@ -21,8 +21,10 @@ uint32_t MemoryManager::read(uint32_t logicalAddress, PCB &process)
     process.mem_accesses_total.fetch_add(1);
     process.mem_reads.fetch_add(1);
 
-    // A cache já trata o mapeamento lógico → físico internamente
-    uint32_t data = L1_cache->read(logicalAddress, this, process);
+    // Translate to physical address BEFORE accessing cache (PIPT)
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    uint32_t data = L1_cache->read(physicalAddress, this, process);
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 
@@ -36,6 +38,12 @@ void MemoryManager::loadProcessData(uint32_t logicalAddress, uint32_t data, PCB 
     uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
 
     mainMemory->WriteMem(physicalAddress, data);
+    
+    // Invalidate cache line if present (or just rely on PIPT and empty cache at start)
+    // Since we are writing directly to memory, we should ensure cache consistency.
+    // But loadProcessData is usually called before execution.
+    // If we want to be safe, we could write through cache, but that would pollute it.
+    // For now, direct write is fine as long as cache is empty or PIPT handles it.
 
     process.primary_mem_accesses.fetch_add(1);
 }
@@ -46,7 +54,10 @@ void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB &process)
     process.mem_accesses_total.fetch_add(1);
     process.mem_writes.fetch_add(1);
 
-    L1_cache->write(logicalAddress, data, this, process);
+    // Translate to physical address BEFORE accessing cache (PIPT)
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    L1_cache->write(physicalAddress, data, this, process);
     std::cout << "Escrevendo na memória através da cache\n";
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
@@ -96,6 +107,12 @@ uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB 
 
         process.pageTable[pageNumber] = newEntry;
 
+        // Zero-fill the newly allocated frame to ensure deterministic behavior
+        uint32_t frameStartAddr = newEntry.frameNumber * this->pageSize;
+        for (uint32_t i = 0; i < this->pageSize; ++i) {
+            mainMemory->WriteMem(frameStartAddr + i, 0);
+        }
+
         process.secondary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
@@ -115,6 +132,15 @@ void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     L1_cache->setReplacementPolicy(policy);
+}
+
+void MemoryManager::invalidateCache()
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    if (L1_cache)
+    {
+        L1_cache->invalidate();
+    }
 }
 
 // Função chamada pela cache para write-back, ou seja, escrita na memória física diretamente
@@ -162,6 +188,33 @@ uint32_t MemoryManager::readFromPhysical(uint32_t logicalAddress, PCB &process)
     return data;
 }
 
+uint32_t MemoryManager::readRaw(uint32_t physicalAddress)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    if (physicalAddress < mainMemoryLimit)
+    {
+        return mainMemory->ReadMem(physicalAddress);
+    }
+    else
+    {
+        return secondaryMemory->ReadMem(physicalAddress - mainMemoryLimit);
+    }
+}
+
+void MemoryManager::writeRaw(uint32_t physicalAddress, uint32_t data)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    if (physicalAddress < mainMemoryLimit)
+    {
+        mainMemory->WriteMem(physicalAddress, data);
+    }
+    else
+    {
+        secondaryMemory->WriteMem(physicalAddress - mainMemoryLimit, data);
+    }
+}
+
+// Função para liberar as páginas alocadas por um processo
 void MemoryManager::freeProcessPages(PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);

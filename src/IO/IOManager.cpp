@@ -12,8 +12,6 @@ IOManager::IOManager() :
     network_requesting(false),
     shutdown_flag(false)
 {
-    srand(time(nullptr));
-
     resultFile.open("output/resultados.dat", std::ios::app);
     outputFile.open("output/output.dat", std::ios::app);
 
@@ -51,18 +49,9 @@ void IOManager::managerLoop() {
         // ETAPA 1: Simula os dispositivos solicitando uma operação
         {
             std::lock_guard<std::mutex> lock(device_state_lock);
-            if (rand() % 100 == 0) {
-                if (!printer_requesting) {
-                    printer_requesting = true;
-                    // std::cout << "I/O Manager: [Impressora] está solicitando uma operação." << std::endl;
-                }
-            }
-            if (rand() % 50 == 0) {
-                if (!disk_requesting) {
-                    disk_requesting = true;
-                    // std::cout << "I/O Manager: [Disco] está solicitando uma operação." << std::endl;
-                }
-            }
+            // Deterministic: Always ready to accept requests
+            printer_requesting = true;
+            disk_requesting = true;
         }
 
         // ETAPA 2: Verifica se há dispositivos solicitando E processos esperando
@@ -88,7 +77,7 @@ void IOManager::managerLoop() {
                 if (new_request) {
                     new_request->process = process_to_service;
                     waiting_processes.erase(waiting_processes.begin());
-                    new_request->cost_cycles = std::chrono::milliseconds((rand() % 3 + 1) * 100);
+                    new_request->cost_cycles = std::chrono::milliseconds(100); // Fixed cost
                 }
             }
         }

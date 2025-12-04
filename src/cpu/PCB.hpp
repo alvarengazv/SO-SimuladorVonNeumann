@@ -35,6 +35,79 @@ struct PageTableEntry {
     bool dirty;          
 };
 
+// Cycle-accurate metrics for detailed analysis
+struct CycleMetrics {
+    // Cycle counts (sum of all stage cycles - equals 5 * instructions for 5-stage pipeline)
+    std::atomic<uint64_t> totalCycles{0};           // Total stage-cycles consumed
+    std::atomic<uint64_t> fetchCycles{0};           // Cycles spent in fetch stage
+    std::atomic<uint64_t> decodeCycles{0};          // Cycles spent in decode stage
+    std::atomic<uint64_t> executeCycles{0};         // Cycles spent in execute stage
+    std::atomic<uint64_t> memoryCycles{0};          // Cycles spent in memory stage
+    std::atomic<uint64_t> writebackCycles{0};       // Cycles spent in writeback stage
+    
+    // Wall-clock cycles (actual clock ticks while this process was active)
+    std::atomic<uint64_t> wallClockCycles{0};       // True elapsed cycles
+    
+    // Stall tracking
+    std::atomic<uint64_t> stallCycles{0};           // Total cycles wasted due to stalls
+    std::atomic<uint64_t> fetchStalls{0};           // Stalls waiting for branch resolution
+    std::atomic<uint64_t> decodeStalls{0};          // Stalls waiting for data hazards
+    std::atomic<uint64_t> memoryStalls{0};          // Stalls waiting for memory
+    
+    // Instruction tracking
+    std::atomic<uint64_t> instructionsCompleted{0}; // Instructions that reached WB
+    std::atomic<uint64_t> instructionsFlushed{0};   // Instructions flushed due to branch
+    
+    // Start/end timestamps
+    uint64_t startCycle{0};                         // First cycle of execution
+    uint64_t endCycle{0};                           // Last cycle of execution
+    
+    // Wall-clock cycles (actual elapsed cycles from GlobalClock)
+    // In a 5-stage pipeline: wall-clock = N_instructions + 4 (fill time)
+    uint64_t getWallClockCycles() const {
+        uint64_t wall = wallClockCycles.load();
+        if (wall > 0) {
+            // wallClockCycles counts fetches, add 4 for pipeline drain (last instruction
+            // takes 4 more cycles to complete after its fetch)
+            return wall + 4;
+        }
+        // Fallback to endCycle - startCycle if available
+        if (endCycle > startCycle) return endCycle - startCycle;
+        // Last resort: instructions + 4
+        uint64_t completed = instructionsCompleted.load();
+        return (completed > 0) ? (completed + 4) : 0;
+    }
+    
+    // CPI calculation using wall-clock cycles (true pipeline efficiency)
+    double getCPI() const {
+        uint64_t completed = instructionsCompleted.load();
+        if (completed == 0) return 0.0;
+        uint64_t wallClock = getWallClockCycles();
+        return static_cast<double>(wallClock) / static_cast<double>(completed);
+    }
+    
+    // IPC calculation using wall-clock cycles
+    double getIPC() const {
+        uint64_t wallClock = getWallClockCycles();
+        if (wallClock == 0) return 0.0;
+        return static_cast<double>(instructionsCompleted.load()) / static_cast<double>(wallClock);
+    }
+    
+    // Stage-based CPI (always 5.0 for 5-stage pipeline - useful for validation)
+    double getStageCPI() const {
+        uint64_t completed = instructionsCompleted.load();
+        if (completed == 0) return 0.0;
+        return static_cast<double>(totalCycles.load()) / static_cast<double>(completed);
+    }
+    
+    // Stage utilization
+    double getStageUtilization(uint64_t stageCycles) const {
+        uint64_t total = totalCycles.load();
+        if (total == 0) return 0.0;
+        return static_cast<double>(stageCycles) / static_cast<double>(total) * 100.0;
+    }
+};
+
 struct PCB {
     int pid = 0;
     std::vector<int> coresAssigned;
@@ -69,6 +142,9 @@ struct PCB {
     std::unordered_map<uint32_t, PageTableEntry> pageTable;
 
     MemWeights memWeights;
+    
+    // Cycle-accurate metrics from GlobalClock
+    CycleMetrics cycleMetrics;
 
     // Saída lógica gerada pelo programa (ex.: instruções PRINT)
     std::vector<std::string> programOutput;
@@ -86,6 +162,11 @@ struct PCB {
 
     int totalTimeExecution() const {
         return (timeStamp + memory_cycles.load() + io_cycles.load());
+    }
+    
+    // Cycle-accurate total execution time
+    uint64_t totalCycleExecution() const {
+        return cycleMetrics.totalCycles.load();
     }
 };
 

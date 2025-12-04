@@ -103,7 +103,8 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
 
     for (size_t i = 0; i < wordsPerLine; i++) {
         uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-        line.data[i] = mem->readFromPhysical(wordAddress, process);
+        // Use readRaw to bypass translation (since we are using PIPT)
+        line.data[i] = mem->readRaw(wordAddress);
     }
 
     line.tag = blockTag;
@@ -131,7 +132,8 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
         for (size_t i = 0; i < wordsPerLine; ++i) {
             uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-            mem->writeToPhysical(wordAddress, line.data[i], process);
+            // Use writeRaw to bypass translation
+            mem->writeRaw(wordAddress, line.data[i]);
         }
     }
 

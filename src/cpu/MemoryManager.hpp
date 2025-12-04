@@ -29,11 +29,17 @@ public:
     void loadProcessData(uint32_t logicalAddress, uint32_t data, PCB &process);
 
     void setCacheReplacementPolicy(ReplacementPolicy policy);
+    void invalidateCache();
 
     // Função auxiliar para o write-back da cache
     void writeToPhysical(uint32_t address, uint32_t data, PCB &process);
 
     uint32_t readFromPhysical(uint32_t logicalAddress, PCB &process);
+    
+    // New methods for direct physical access (bypassing translation)
+    uint32_t readRaw(uint32_t physicalAddress);
+    void writeRaw(uint32_t physicalAddress, uint32_t data);
+
     void freeProcessPages(PCB &process);
 
 private:

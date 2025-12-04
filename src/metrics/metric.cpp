@@ -20,6 +20,28 @@ void print_metrics(const PCB &pcb) {
     std::cout << "Acessos a Mem Secundaria:" << pcb.secondary_mem_accesses.load() << "\n";
     std::cout << "Ciclos Totais de Memoria: " << pcb.memory_cycles.load() << "\n";
     std::cout << "Tempo Total de Execução:  " << pcb.totalTimeExecution() << "\n";
+    
+    // New cycle-accurate metrics
+    std::cout << "\n=== METRICAS CYCLE-ACCURATE ===\n";
+    std::cout << "Ciclos de Estágio (soma): " << pcb.cycleMetrics.totalCycles.load() << "\n";
+    std::cout << "Ciclos Wall-Clock:        " << pcb.cycleMetrics.getWallClockCycles() << "\n";
+    std::cout << "Ciclos por Estágio:\n";
+    std::cout << "  - Fetch:                " << pcb.cycleMetrics.fetchCycles.load() << "\n";
+    std::cout << "  - Decode:               " << pcb.cycleMetrics.decodeCycles.load() << "\n";
+    std::cout << "  - Execute:              " << pcb.cycleMetrics.executeCycles.load() << "\n";
+    std::cout << "  - Memory:               " << pcb.cycleMetrics.memoryCycles.load() << "\n";
+    std::cout << "  - WriteBack:            " << pcb.cycleMetrics.writebackCycles.load() << "\n";
+    std::cout << "Instruções Completadas:   " << pcb.cycleMetrics.instructionsCompleted.load() << "\n";
+    std::cout << "Instruções Descartadas:   " << pcb.cycleMetrics.instructionsFlushed.load() << "\n";
+    std::cout << "Ciclos de Stall:\n";
+    std::cout << "  - Total:                " << pcb.cycleMetrics.stallCycles.load() << "\n";
+    std::cout << "  - Fetch Stalls:         " << pcb.cycleMetrics.fetchStalls.load() << "\n";
+    std::cout << "  - Decode Stalls:        " << pcb.cycleMetrics.decodeStalls.load() << "\n";
+    std::cout << "  - Memory Stalls:        " << pcb.cycleMetrics.memoryStalls.load() << "\n";
+    std::cout << "CPI (Wall-Clock):         " << std::fixed << std::setprecision(2) << pcb.cycleMetrics.getCPI() << "\n";
+    std::cout << "IPC (Wall-Clock):         " << std::fixed << std::setprecision(2) << pcb.cycleMetrics.getIPC() << "\n";
+    std::cout << "CPI (Estágios):           " << std::fixed << std::setprecision(2) << pcb.cycleMetrics.getStageCPI() << " (sempre 5.0 = 5 estágios)\n";
+    
     std::cout << "Cores Utilizados:        ";
     for (const auto& core : pcb.coresAssigned) {
         std::cout << core << " ";

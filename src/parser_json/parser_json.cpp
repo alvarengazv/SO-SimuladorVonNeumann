@@ -35,6 +35,7 @@ const unordered_map<string, int> registerMap = {
 
 static unordered_map<string, int> dataMap;
 static unordered_map<string, int> labelMap;
+static int currentProgramStartAddr = 0;  // Track start address for J-type encoding
 
 // ======= Utils e Helpers (sem alterações) =======
 string toLower(string s){
@@ -188,7 +189,11 @@ uint32_t encodeJType(const json &j){
     if (j.contains("label")){
         const string lbl = j.at("label").get<string>();
         if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida (J): " + lbl);
-        int addr = labelMap[lbl] & 0x03FFFFFF;
+        // labelMap contains instruction index; convert to actual memory address
+        int instrIndex = labelMap[lbl];
+        int addr = (currentProgramStartAddr + instrIndex * 4) & 0x03FFFFFF;
+        std::cerr << "[J-type DEBUG] label=" << lbl << " instrIndex=" << instrIndex 
+                  << " startAddr=" << currentProgramStartAddr << " finalAddr=" << addr << std::endl;
         return buildBinaryInstruction(opcode, 0,0,0,0,0, 0, addr);
     }
     if (j.contains("address")){
@@ -297,11 +302,23 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
     if (!programJson.is_array()) {
         return startAddr;
     }
-
+    
+    // Set global start address for J-type encoding
+    currentProgramStartAddr = startAddr;
+    std::cerr << "[parseProgram DEBUG] startAddr=" << startAddr << std::endl;
+    
+    // First pass: collect labels with instruction indices (for relative branches)
     int instruction_address_counter = 0;
     for (const auto &node : programJson) {
-        if (node.contains("label")) {
-            labelMap[node["label"].get<string>()] = instruction_address_counter;
+        if (node.contains("label") && node.contains("instruction")) {
+            // Only treat as label definition if NOT a J-type instruction (j, jal use "label" as target)
+            string instr = node["instruction"].get<string>();
+            if (instr != "j" && instr != "jal") {
+                // Store instruction index for relative calculations
+                labelMap[node["label"].get<string>()] = instruction_address_counter;
+                std::cerr << "[parseProgram DEBUG] label=" << node["label"].get<string>() 
+                          << " instrIndex=" << instruction_address_counter << std::endl;
+            }
         }
         if (node.contains("instruction")) {
             instruction_address_counter++;

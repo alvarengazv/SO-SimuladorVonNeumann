@@ -11,10 +11,16 @@ CPUCore::CPUCore(std::size_t coreId,
                  IOManager &ioManager)
     : coreId(coreId),
       memManager(memManager),
-      ioManager(ioManager) {}
+      ioManager(ioManager) {
+    // Pass the coreId as pipelineId for GlobalClock synchronization
+    pipeline = std::make_unique<Pipeline>(static_cast<int>(coreId));
+}
 
 CPUCore::~CPUCore() {
     stop();
+    if (pipeline) {
+        pipeline->stop();
+    }
 }
 
 void CPUCore::start() {
@@ -56,6 +62,7 @@ void CPUCore::submitProcess(PCB *process, bool printLockState) {
     }
 
     currentProcess = process;
+    memManager.invalidateCache(); // ensures next process does not reuse stale cache lines
     currentPrintLock = printLockState;
     ioRequestsBuffer.clear();
     lock.unlock();
@@ -95,7 +102,7 @@ void CPUCore::workerLoop() {
 
         ioRequestsBuffer.clear();
         std::atomic<bool> printLock(printLockState);
-        Core(memManager, *process, &ioRequestsBuffer, printLock, schedulingAlgorithm);
+        pipeline->run(memManager, *process, &ioRequestsBuffer, printLock, schedulingAlgorithm);
 
         {
             std::lock_guard<std::mutex> lock(workMutex);

@@ -16,21 +16,31 @@
 #include <cstring>   // memcpy (opcional)
 #include <algorithm> // std::reverse (não usado para performance)
 #include <cassert>   // assert (checagem em debug)
+#include <atomic>
 
 struct REGISTER {
     // Armazena o valor do registrador (palavra de 32 bits)
     // Inicializado em 0 por convenção.
-    uint32_t value;
+    std::atomic<uint32_t> value;
 
     // Construtor: zera o registrador por padrão
     REGISTER() : value(0u) {}
+
+    // Copy constructor
+    REGISTER(const REGISTER& other) : value(other.read()) {}
+
+    // Assignment operator
+    REGISTER& operator=(const REGISTER& other) {
+        value.store(other.read());
+        return *this;
+    }
 
     // Escreve um novo valor no registrador.
     // Nota: não há proteção contra escrita em registrador zero (R0) aqui;
     // se quiser essa proteção (como MIPS), trate-a em um nível superior
     // (ex.: no banco de registradores).
     inline void write(uint32_t new_value) {
-        value = new_value;
+        value.store(new_value, std::memory_order_release);
     }
 
     // read()
@@ -39,7 +49,7 @@ struct REGISTER {
     //   ignore o valor retornado (útil em operações críticas).
     // - Const: não modifica o registrador.
     [[nodiscard]] inline uint32_t read() const {
-        return value;
+        return value.load(std::memory_order_acquire);
     }
 
     // reverse_read()

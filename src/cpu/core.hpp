@@ -11,6 +11,7 @@
 #include "MemoryManager.hpp"
 #include "PCB.hpp"
 #include "../IO/IOManager.hpp"
+#include "Pipeline.hpp"
 
 class CPUCore {
 public:
@@ -50,6 +51,8 @@ private:
     bool currentPrintLock{true};
     std::vector<std::unique_ptr<IORequest>> ioRequestsBuffer;
     int schedulingAlgorithm = 0;
+
+    std::unique_ptr<Pipeline> pipeline;
 };
 
 #endif

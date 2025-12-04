@@ -12,6 +12,9 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
+
+#include <set>
 
 #include "datapath/REGISTER_BANK.hpp" // Incluído diretamente para ter a definição completa
 #include "datapath/ULA.hpp"
@@ -34,8 +37,6 @@ class MemoryManager;
 struct PCB;
 struct IORequest;
 
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId);
-
 struct ControlContext {
     hw::REGISTER_BANK &registers;
     MemoryManager &memManager;
@@ -45,6 +46,13 @@ struct ControlContext {
     std::atomic<bool> &endProgram;
     std::atomic<bool> &endExecution;
     std::function<void()> flushPipeline;
+    std::atomic<uint32_t> resumePc{0};
+    std::atomic<bool> resumePcValid{false};
+    std::atomic<bool> branchTaken{false}; // Flag to signal fetch to stop/discard
+    
+    std::set<std::string> pendingLoads;
+    std::mutex scoreboardMutex;
+    std::condition_variable scoreboardCv;
 };
 
 struct Control_Unit {
@@ -70,7 +78,7 @@ struct Control_Unit {
     string Identificacao_instrucao(uint32_t instruction);
 
     uint32_t FetchInstruction(ControlContext &context);
-    void Decode(uint32_t instruction, Instruction_Data &data);
+    void Decode(uint32_t instruction, Instruction_Data &data, ControlContext &context);
     void Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &d);
     void Execute_Operation(Instruction_Data &data, ControlContext &context);
     void Execute_Loop_Operation(Instruction_Data &d, ControlContext &context);
@@ -85,6 +93,11 @@ struct Control_Unit {
                                     Instruction_Data &current,
                                     ControlContext &context,
                                     int32_t &value);
+    std::string toBinStr(uint32_t v, int width);
+    void account_pipeline_cycle(PCB &p);
+    void account_stage(PCB &p);
+    
+    void reset();
     std::mutex forwardingMutex;
     std::condition_variable forwardingCv;
 };

@@ -80,15 +80,15 @@ static std::string regIndexToBitString(uint32_t idx) {
     return s;
 }
 
-static std::string toBinStr(uint32_t v, int width) {
+std::string Control_Unit::toBinStr(uint32_t v, int width) {
     std::string s(width, '0');
     for (int i = 0; i < width; ++i)
         s[width - 1 - i] = ((v >> i) & 1) ? '1' : '0';
     return s;
 }
 
-static inline void account_pipeline_cycle(PCB &p) { p.pipeline_cycles.fetch_add(1); }
-static inline void account_stage(PCB &p) { p.stage_invocations.fetch_add(1); }
+void Control_Unit::account_pipeline_cycle(PCB &p) { p.pipeline_cycles.fetch_add(1); }
+void Control_Unit::account_stage(PCB &p) { p.stage_invocations.fetch_add(1); }
 
 std::string Control_Unit::resolveRegisterName(const std::string &bits) const {
     if (bits.empty()) {
@@ -112,11 +112,9 @@ bool Control_Unit::readRegisterWithForwarding(const std::string &name,
         return true;
     }
 
-    int32_t regValue = static_cast<int32_t>(context.registers.readRegister(name));
-    value = regValue;
-
     // Registradores somente leitura (ex.: zero) não participam do mecanismo de forwarding.
     if (map.isReadOnly(name)) {
+        value = static_cast<int32_t>(context.registers.readRegister(name));
         return true;
     }
 
@@ -132,6 +130,10 @@ bool Control_Unit::readRegisterWithForwarding(const std::string &name,
             if (memIt != memWbFwd.end()) {
                 value = memIt->second;
                 sourceLabel = "LOAD";
+            } else {
+                // Se não há forwarding, lê do registrador ENQUANTO segura o lock
+                // Isso evita a race condition com Write_Back
+                value = static_cast<int32_t>(context.registers.readRegister(name));
             }
         }
     }
@@ -171,6 +173,8 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
     std::string opcode_bin = toBinStr(opcode, 6);
 
     // Se existir mapa textual (instructionMap), mantenha compatibilidade
+    // REMOVIDO: O mapa instructionMap em CONTROL_UNIT.hpp está incorreto e conflita com os opcodes do parser.
+    /*
     for (const auto &p : instructionMap) {
         if (p.second == opcode_bin) {
             std::string key = p.first;
@@ -178,6 +182,7 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
             return key;
         }
     }
+    */
 
     // Tratamento por opcode numérico (MIPS-like / convenções comuns)
     switch (opcode) {
@@ -210,22 +215,41 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
 }
 
 uint32_t Control_Unit::FetchInstruction(ControlContext &context) {
+    // If a branch was taken recently, we might be fetching from the wrong path.
+    // Wait for the branch flag to clear (handled by pipeline controller or just check here)
+    // Actually, if branchTaken is true, we should probably pause or discard.
+    // But for now, let's just check if we should stop.
+    if (context.branchTaken.load(std::memory_order_acquire)) {
+        return END_SENTINEL; // Or some NOP
+    }
+
     account_stage(context.process);
     uint32_t pcValue = context.registers.pc.read();
     context.registers.mar.write(pcValue);
     uint32_t instr = context.memManager.read(pcValue, context.process);
     context.registers.ir.write(instr);
 
-    if (instr != END_SENTINEL) {
-        context.registers.pc.write(pcValue + 4);
+    std::cout << "[FETCH] pid=" << context.process.pid << " PC=" << pcValue 
+              << " instr=0x" << std::hex << instr << std::dec << "\n";
+
+    if (instr != END_SENTINEL && instr != MEMORY_ACCESS_ERROR) {
+        if (!context.branchTaken.load(std::memory_order_acquire)) {
+             context.registers.pc.write(pcValue + 4);
+        }
+    } else if (instr == END_SENTINEL) {
+        // Only set endProgram if no branch was taken (branch could redirect us)
+        if (!context.branchTaken.load(std::memory_order_acquire)) {
+            context.endProgram.store(true, std::memory_order_relaxed);
+        }
     } else {
+        // Memory error
         context.endProgram.store(true, std::memory_order_relaxed);
     }
 
     return instr;
 }
 
-void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
+void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data, ControlContext &context) {
     data = Instruction_Data{};
     data.rawInstruction = instruction;
     data.op = Identificacao_instrucao(instruction);
@@ -276,6 +300,35 @@ void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
     if (!data.destination_register.empty()) {
         data.destinationRegisterName = resolveRegisterName(data.destination_register);
     }
+
+    // --- Scoreboard Logic for Load-Use Hazard ---
+    {
+        std::unique_lock<std::mutex> lock(context.scoreboardMutex);
+        context.scoreboardCv.wait(lock, [&](){
+            bool rsBusy = !data.sourceRegisterName.empty() && context.pendingLoads.count(data.sourceRegisterName);
+            // For R-type, rt is source. For I-type (ADDI), rt is dest. For Store, rt is source.
+            // We need to check if rt is used as source.
+            // ADDI: rt is dest. rs is source.
+            // ADD: rs, rt are sources.
+            // SW: rs (base), rt (value) are sources.
+            // BEQ: rs, rt are sources.
+            
+            bool rtIsSource = false;
+            if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV" ||
+                data.op == "SW" || data.op == "BEQ" || data.op == "BNE" || data.op == "BGT" || data.op == "BLT") {
+                rtIsSource = true;
+            }
+            
+            bool rtBusy = rtIsSource && !data.targetRegisterName.empty() && context.pendingLoads.count(data.targetRegisterName);
+            
+            return !rsBusy && !rtBusy;
+        });
+        
+        if (data.op == "LW" && !data.targetRegisterName.empty()) {
+            context.pendingLoads.insert(data.targetRegisterName);
+        }
+    }
+    // --------------------------------------------
 
     auto setWriteIntent = [&](const std::string &regName) {
         if (regName.empty()) {
@@ -465,9 +518,14 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
 
             // TRACE PRINT from register
             std::cout << "[PRINT-REQ] PRINT REG " << name << " value=" << value
-                      << " (pid=" << context.process.pid << ")\n";
+                      << " (pid=" << context.process.pid << ")"
+                      << " [instructionAddress=" << data.instructionAddress << "]\n";
 
             if (context.printLock.load(std::memory_order_relaxed)) {
+                // Save resume PC (next instruction after PRINT)
+                context.resumePc.store(data.instructionAddress + 4, std::memory_order_release);
+                context.resumePcValid.store(true, std::memory_order_release);
+                context.flushPipeline(); // Flush instructions after PRINT
                 context.process.state.store(State::Blocked);
                 context.endExecution.store(true);
             }
@@ -478,6 +536,23 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
 void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext &context) {
     std::string name_rs = data.sourceRegisterName;
     std::string name_rt = data.targetRegisterName;
+
+    // J-type instructions don't use registers - handle them first
+    if (data.op == "J") {
+        std::cerr << "[JUMP DEBUG] J instruction detected, addressRAMResult='" << data.addressRAMResult << "'" << std::endl;
+        if (!data.addressRAMResult.empty()) {
+            uint32_t addr = binaryStringToUint(data.addressRAMResult);
+            std::cerr << "[JUMP DEBUG] pid=" << context.process.pid << " jumping to addr=" << addr 
+                      << " endProgram_before=" << context.endProgram.load() << std::endl;
+            context.branchTaken.store(true, std::memory_order_release);
+            context.resumePcValid.store(false, std::memory_order_release); // Jump overrides resume point
+            context.endProgram.store(false, std::memory_order_release); // Clear endProgram - jump overrides END
+            context.registers.pc.write(addr);
+            FlushPipeline(context);
+            std::cerr << "[JUMP DEBUG] pid=" << context.process.pid << " after flush, endProgram=" << context.endProgram.load() << std::endl;
+        }
+        return;
+    }
 
     if (name_rs.empty()) {
         return;
@@ -500,12 +575,12 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
     bool jump = false;
     if (data.op == "BEQ") { alu.op = BEQ; alu.calculate(); jump = (alu.result == 1); }
     else if (data.op == "BNE") { alu.op = BNE; alu.calculate(); jump = (alu.result == 1); }
-    else if (data.op == "J") { jump = true; }
     else if (data.op == "BLT") { alu.op = BLT; alu.calculate(); jump = (alu.result == 1); }
     else if (data.op == "BGT") { alu.op = BGT; alu.calculate(); jump = (alu.result == 1); }
 
     if (jump && !data.addressRAMResult.empty()) {
         uint32_t addr = binaryStringToUint(data.addressRAMResult);
+        context.branchTaken.store(true, std::memory_order_release); // Signal fetch to stop
         context.registers.pc.write(addr);
         FlushPipeline(context);
         context.endProgram.store(false, std::memory_order_relaxed);
@@ -574,6 +649,7 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
         Execute_Aritmetic_Operation(context, data);
     } else if (data.op == "BEQ" || data.op == "J" || data.op == "BNE" || data.op == "BGT" || data.op == "BGTI" || data.op == "BLT" || data.op == "BLTI") {
+        std::cerr << "[EXECUTE DEBUG] pid=" << context.process.pid << " calling Execute_Loop_Operation for op=" << data.op << std::endl;
         Execute_Loop_Operation(data, context);
     } else if (data.op == "PRINT") {
         Execute_Operation(data, context);
@@ -613,6 +689,10 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
         }
 
         if (context.printLock.load(std::memory_order_relaxed)) {
+            // Save resume PC (next instruction after PRINT)
+            context.resumePc.store(data.instructionAddress + 4, std::memory_order_release);
+            context.resumePcValid.store(true, std::memory_order_release);
+            context.flushPipeline(); // Flush instructions after PRINT
             context.process.state.store(State::Blocked);
             context.endExecution.store(true);
         }
@@ -641,6 +721,15 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     }
 
     context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
+
+    // --- Scoreboard Logic ---
+    if (data.op == "LW") {
+        std::lock_guard<std::mutex> lock(context.scoreboardMutex);
+        context.pendingLoads.erase(data.writeRegisterName);
+        context.scoreboardCv.notify_all();
+    }
+    // ------------------------
+
     {
         std::lock_guard<std::mutex> guard(forwardingMutex);
         exMemFwd.erase(data.writeRegisterName);
@@ -653,177 +742,17 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     forwardingCv.notify_all();
 }
 
+void Control_Unit::reset() {
+    data.clear();
+    {
+        std::lock_guard<std::mutex> guard(forwardingMutex);
+        exMemFwd.clear();
+        memWbFwd.clear();
+    }
+}
+
 void Control_Unit::FlushPipeline(ControlContext &context) {
     if (context.flushPipeline) {
         context.flushPipeline();
     }
-}
-
-// A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
-void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId) {
-    Control_Unit UC;
-
-    std::atomic<bool> endProgram{false};
-    std::atomic<bool> endExecution{false};
-
-    ControlContext context{ process.regBank, memoryManager, *ioRequests, printLock, process, endProgram, endExecution };
-
-    PipelineRegister ifId;
-    PipelineRegister idEx;
-    PipelineRegister exMem;
-    PipelineRegister memWb;
-
-    context.flushPipeline = [&]() {
-        ifId.flush();
-        idEx.flush();
-    };
-
-    std::atomic<int> issuedCycles{0};
-
-    auto makeDrainToken = [&](bool programEndedFlag) {
-        PipelineToken drain;
-        drain.terminate = true;
-        drain.programEnded = programEndedFlag;
-        return drain;
-    };
-
-    std::thread fetchThread([&]() {
-        bool drainSent = false;
-        while (true) {
-            if (endExecution.load(std::memory_order_relaxed)) {
-                break;
-            }
-
-            uint32_t instruction = UC.FetchInstruction(context);
-            if (context.endProgram.load(std::memory_order_relaxed)) {
-                drainSent = true;
-                ifId.push(makeDrainToken(true));
-                break;
-            }
-
-            PipelineToken token;
-            token.entry = &UC.data.emplace_back();
-            token.valid = true;
-            token.instruction = instruction;
-            ifId.push(token);
-
-            issuedCycles.fetch_add(1, std::memory_order_relaxed);
-            account_pipeline_cycle(process);
-
-            if (schedulerId == 0 && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
-                endExecution.store(true, std::memory_order_relaxed);
-                break;
-            }
-        }
-
-        if (!drainSent) {
-            bool programEndedFlag = context.endProgram.load(std::memory_order_relaxed);
-            ifId.push(makeDrainToken(programEndedFlag));
-        }
-    });
-
-    std::thread decodeThread([&]() {
-        PipelineToken token;
-        while (ifId.pop(token)) {
-            if (token.terminate) {
-                idEx.push(token);
-                break;
-            }
-            if (!token.valid) {
-                continue;
-            }
-            account_stage(context.process);
-            UC.Decode(token.instruction, *token.entry);
-            token.instruction = 0;
-            idEx.push(token);
-        }
-    });
-
-    std::thread executeThread([&]() {
-        PipelineToken token;
-        while (idEx.pop(token)) {
-            if (token.terminate) {
-                exMem.push(token);
-                break;
-            }
-            if (!token.valid) {
-                continue;
-            }
-            UC.Execute(*token.entry, context);
-            exMem.push(token);
-        }
-    });
-
-    std::thread memoryThread([&]() {
-        PipelineToken token;
-        while (exMem.pop(token)) {
-            if (token.terminate) {
-                memWb.push(token);
-                break;
-            }
-            if (!token.valid) {
-                continue;
-            }
-            UC.Memory_Acess(*token.entry, context);
-            memWb.push(token);
-        }
-    });
-
-    std::thread writeThread([&]() {
-        PipelineToken token;
-        while (memWb.pop(token)) {
-            if (token.terminate) {
-                if (token.programEnded) {
-                    context.endProgram.store(true, std::memory_order_relaxed);
-                }
-                break;
-            }
-            if (!token.valid) {
-                continue;
-            }
-            UC.Write_Back(*token.entry, context);
-        }
-    });
-
-    fetchThread.join();
-    decodeThread.join();
-    executeThread.join();
-    memoryThread.join();
-    writeThread.join();
-
-    process.timeStamp += issuedCycles.load(std::memory_order_relaxed);
-
-    if (context.endProgram.load(std::memory_order_relaxed)) {
-        process.state.store(State::Finished);
-    } else if (process.state.load() != State::Blocked) {
-        process.state.store(State::Ready);
-    }
-
-    // === DUMP FINAL DOS REGISTRADORES ===
-    {
-        const vector<string> fallback_names = {
-            "zero","at","v0","v1","a0","a1","a2","a3",
-            "t0","t1","t2","t3","t4","t5","t6","t7",
-            "s0","s1","s2","s3","s4","s5","s6","s7",
-            "t8","t9","k0","k1","gp","sp","fp","ra"
-        };
-
-        try {
-            for (uint32_t i = 0; i < 32; ++i) {
-                string name;
-                if (i < fallback_names.size()) name = fallback_names[i];
-                else name = "r" + to_string(i);
-                (void)context.registers.readRegister(name);
-            }
-        } catch (...) {
-            // Ignora erros durante o dump
-        }
-
-        std::cout << "PC = " << context.registers.pc.read() << "\n";
-        std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
-                  << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
-        std::cout << "========================================\n\n";
-    }
-
-    return nullptr;
 }
