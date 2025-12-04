@@ -188,6 +188,7 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
                 std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
                 print_metrics(process);
             }
+            memManager.freeProcessPages(process);
             finishedProcesses++;
             break;
         }
