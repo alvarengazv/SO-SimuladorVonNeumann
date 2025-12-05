@@ -25,7 +25,6 @@ MODULE_SRCS := $(wildcard src/cpu/*.cpp) \
                $(wildcard src/IO/*.cpp) \
                $(wildcard src/parser_json/*.cpp) \
                $(wildcard src/process_scheduler/*.cpp) \
-			   $(wildcard src/tasks/*.cpp) \
 			   $(wildcard src/metrics/*.cpp) \
 			   $(wildcard src/simulator/*.cpp) \
                $(wildcard src/cpu/cache/*.cpp) \

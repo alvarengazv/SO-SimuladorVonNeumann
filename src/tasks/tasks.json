@@ -1,12 +1,6 @@
 {
-  "pcb":{
-    "pid": 1,
-    "name": "processo_teste_1",
-    "quantum": 0,
-    "priority": 0
-  },
   "metadata": {
-    "task_id": "prog_full_test",
+    "name": "processo_teste_1",
     "author": "grupoPeripherals",
     "description": "Programa para validar parser JSON -> MIPS"
   },
@@ -32,24 +26,24 @@
     { "instruction": "mult", "rd": "$t6", "rs": "$t1", "rt": "$t1" },
     { "instruction": "div", "rd": "$t7", "rs": "$t0", "rt": "$t1" },
 
-    { "instruction": "lw", "rt": "$s0", "offset": 0, "base": "x" },
-    { "instruction": "lw", "rt": "$s1", "offset": 0, "base": "y" },
+    { "instruction": "lw", "rt": "$s0", "base": "x" },
+    { "instruction": "lw", "rt": "$s1", "base": "y" },
     { "instruction": "add", "rd": "$s2", "rs": "$s0", "rt": "$s1" },
-    { "instruction": "sw", "rt": "$s2", "offset": 0, "base": "z" },
+    { "instruction": "sw", "rt": "$s2", "base": "z" },
 
     { "instruction": "lw", "rt": "$s3", "offset": 2, "base": "numbers" },
     { "instruction": "addi", "rt": "$s3", "rs": "$s3", "immediate": 10 },
     { "instruction": "sw", "rt": "$s3", "offset": 1, "base": "result" },
 
-    { "label": "loop", "instruction": "lw", "rt": "$t8", "offset": 0, "base": "counter" },
-    { "instruction": "beq", "rs": "$t8", "rt": "$zero", "label": "end_loop" },
+    { "label": "loop", "instruction": "lw", "rt": "$t8", "base": "counter" },
+    { "instruction": "beq", "rs": "$t8", "rt": "$zero", "offset": 4 },
     { "instruction": "addi", "rt": "$t8", "rs": "$t8", "immediate": -1 },
-    { "instruction": "sw", "rt": "$t8", "offset": 0, "base": "counter" },
+    { "instruction": "sw", "rt": "$t8", "base": "counter" },
     { "instruction": "j", "label": "loop" },
     { "label": "end_loop", "instruction": "print", "rt": "$t8" },
 
-    { "instruction": "bgt", "rs": "$t0", "rt": "$t1", "label": "greater_case" },
-    { "instruction": "blt", "rs": "$t0", "rt": "$t1", "label": "less_case" },
+    { "instruction": "bgt", "rs": "$t0", "rt": "$t1", "offset": 2 },
+    { "instruction": "blt", "rs": "$t0", "rt": "$t1", "offset": 4 },
 
     { "label": "greater_case", "instruction": "li", "rt": "$a0", "immediate": 111 },
     { "instruction": "j", "label": "after_compare" },

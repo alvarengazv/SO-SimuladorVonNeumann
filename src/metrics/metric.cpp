@@ -24,8 +24,8 @@ void print_metrics(const PCB &pcb) {
     for (const auto& core : pcb.coresAssigned) {
         std::cout << core << " ";
     }
-    std::cout << "\nSaída do Programa:\n";
-    
+    std::cout << "\nSaída do Programa (PID " << pcb.pid << "):\n";
+
     if (programOutput.empty()) {
         std::cout << "  (Sem saída registrada)\n";
     } else {
@@ -62,7 +62,7 @@ void print_metrics(const PCB &pcb) {
             resultados << core << " ";
         }
         resultados << "\n";
-        resultados << "Saída do Programa:\n";
+        resultados << "Saída do Programa (PID " << pcb.pid << "):\n";
         if (programOutput.empty()) {
             resultados << "  (Sem saída registrada)\n";
         } else {
@@ -80,7 +80,7 @@ void print_metrics(const PCB &pcb) {
             output << "=== Saída Lógica do Programa ===\n";
         }
         output << "\n[Programa: " << pcb.name << " | PID " << pcb.pid << "]\n";
-        output << "Saída declarada:\n";
+        output << "Saída declarada (PID " << pcb.pid << "):\n";
         if (programOutput.empty()) {
             output << "  (Sem saída registrada)\n";
         } else {

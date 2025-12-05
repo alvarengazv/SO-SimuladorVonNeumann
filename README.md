@@ -73,8 +73,6 @@ Com base nos arquivos gerados, podemos definir propriamente em qual parte da arq
 - `CONTROL_UNIT.hpp`
 #### PCB:
 - `PCB.hpp`
-- `pcb_loader.cpp`
-- `pcb_loader.hpp`
 #### Registradores:
 - `HASH_REGISTER.hpp`
 - `REGISTER.hpp`
@@ -243,18 +241,6 @@ Tem-se na classe de `RegisterMapper`, mapas bidirecionais para uma performance o
 
 **MemWeights**
 - Conjunto de pesos (`memWeights.cache`, `memWeights.main`, `memWeights.secondary`) usado para calcular custo em ciclos quando o processo acessa cada camada de memória.
-
-**JSON de entrada (pcb_loader)**
-- O `pcb_loader` aceita um JSON com chaves obrigatórias: `pid`, `priority`, `quantum`, `initial_pc` e opcional `memWeights`. Exemplo:
-```json
-{
-  "pid": 1,
-  "priority": 5,
-  "quantum": 5,
-  "initial_pc": 0,
-  "memWeights": { "cache": 1, "main": 10, "secondary": 100 }
-}
-```
 
 ## `CONTROL_UNIT.hpp/.cpp`:
 

@@ -17,7 +17,6 @@
 #include <stdexcept>
 
 #include "../cpu/CONTROL_UNIT.hpp"
-#include "../cpu/pcb_loader.hpp"
 #include "../metrics/metrics.hpp"
 #include "../parser_json/parser_json.hpp"
 #include "../system_config/system_config.hpp"
@@ -38,7 +37,8 @@ private:
     bool loadProcessDefinition(
                                const std::string &taskLabel,
                                const std::string &taskFile,
-                               uint32_t baseAddress = 0);
+                               uint32_t baseAddress = 0,
+                               int pid = 0);
     void moveUnblockedProcesses();
     void executeProcesses();
     void handleCompletion(PCB &process, int &finishedProcesses);

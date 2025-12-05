@@ -153,7 +153,13 @@ uint32_t encodeIType(const json &j, int pcIdx){
             rs = getRegisterCode("$zero");
             const string lbl = j.at("base").get<string>();
             if (!dataMap.count(lbl)) throw runtime_error("Label de dados desconhecida: " + lbl);
-            imm = static_cast<int16_t>(dataMap[lbl] & 0xFFFF);
+            int baseAddr = dataMap[lbl];
+            int off = 0;
+            if (j.contains("offset")) {
+                // Offsets in task JSONs index words; convert to bytes (4 per word)
+                off = parseImmediate(j.at("offset")) * 4;
+            }
+            imm = static_cast<int16_t>((baseAddr + off) & 0xFFFF);
         } else {
             throw runtime_error("lw/sw precisam de 'addr' ou 'baseReg' ou 'base'");
         }
@@ -163,14 +169,16 @@ uint32_t encodeIType(const json &j, int pcIdx){
     if (mnem=="beq" || mnem=="bne" || mnem=="bgt" || mnem=="blt"){
         rs = getRegisterCode(j.at("rs").get<string>());
         rt = getRegisterCode(j.at("rt").get<string>());
-        if (j.contains("label")){
-            const string lbl = j.at("label").get<string>();
-            if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
-            imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
-        } else if (j.contains("offset")){
+        // if (j.contains("label")){
+        //     const string lbl = j.at("label").get<string>();
+        //     if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
+        //     imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
+        // }
+        
+        if (j.contains("offset")){
             imm = parseImmediate(j.at("offset"));
         } else {
-            throw runtime_error(mnem + " requer 'label' ou 'offset'");
+            throw runtime_error(mnem + " requer 'offset'");
         }
         return buildBinaryInstruction(opcode, rs, rt, 0, 0, 0, imm, 0);
     }
@@ -202,6 +210,41 @@ uint32_t encodeJType(const json &j){
         return buildBinaryInstruction(opcode, 0,0,0,0,0, 0, (addr & 0x03FFFFFF));
     }
     throw runtime_error("J-type requer 'label' ou 'address'");
+}
+
+uint32_t encodePrintInstruction(const json &j) {
+    const int opcode = getOpcode("print");
+    int rs = 0;
+    int rt = 0;
+    int16_t imm = 0;
+
+    if (j.contains("rt")) {
+        rt = getRegisterCode(j.at("rt").get<string>());
+    }
+
+    if (j.contains("addr")) {
+        auto pr = parseOffsetBase(j.at("addr").get<string>());
+        imm = pr.first;
+        rs = pr.second;
+    } else if (j.contains("baseReg")) {
+        rs = getRegisterCode(j.at("baseReg").get<string>());
+        imm = j.contains("offset") ? parseImmediate(j.at("offset")) : 0;
+    } else if (j.contains("rs")) {
+        rs = getRegisterCode(j.at("rs").get<string>());
+        imm = j.contains("immediate") ? parseImmediate(j.at("immediate")) : 0;
+    } else if (j.contains("base")) {
+        const string lbl = j.at("base").get<string>();
+        if (!dataMap.count(lbl)) {
+            throw runtime_error("Label de dados desconhecida em PRINT: " + lbl);
+        }
+        imm = static_cast<int16_t>(dataMap[lbl] & 0xFFFF);
+    } else if (j.contains("address")) {
+        imm = parseImmediate(j.at("address"));
+    } else if (j.contains("immediate")) {
+        imm = parseImmediate(j.at("immediate"));
+    }
+
+    return buildBinaryInstruction(opcode, rs, rt, 0, 0, 0, imm, 0);
 }
 
 uint32_t parseInstruction(const json &instrJson, int currentInstrIndex){
@@ -317,13 +360,16 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
         }
         
         uint32_t binary_instruction = parseInstruction(node, current_instruction_addr);
+        std::cout << "Instrução " << node.at("instruction").get<string>() << " carregada na memória: 0x" 
+                  << std::hex << current_mem_addr << " : 0x" 
+                  << std::setw(8) << std::setfill('0') << binary_instruction << std::dec << std::endl;
         
         memManager.loadProcessData(current_mem_addr, binary_instruction, pcb); // Alterado aqui
         
         current_mem_addr += 4;
         current_instruction_addr++;
     }
-
+    // std::cin >> std::ws; // Espera por Enter para continuar
     return current_mem_addr;
 }
 
@@ -340,45 +386,14 @@ int loadJsonProgram(const string &filename, MemoryManager &memManager, PCB& pcb,
 
     json j = readJsonFile(filename);
     int addr = startAddr;
+    if(j.contains("metadata")) {
+        pcb.name = j["metadata"].value("name", std::string(""));
+    }
+
     if (j.contains("data"))    
         addr = parseData(j["data"], memManager, pcb, addr);
     int codeStart = addr;
     if (j.contains("program")) 
         addr = parseProgram(j["program"], memManager, pcb, addr);
     return codeStart;
-}
-
-uint32_t encodePrintInstruction(const json &j) {
-    const int opcode = getOpcode("print");
-    int rs = 0;
-    int rt = 0;
-    int16_t imm = 0;
-
-    if (j.contains("rt")) {
-        rt = getRegisterCode(j.at("rt").get<string>());
-    }
-
-    if (j.contains("addr")) {
-        auto pr = parseOffsetBase(j.at("addr").get<string>());
-        imm = pr.first;
-        rs = pr.second;
-    } else if (j.contains("baseReg")) {
-        rs = getRegisterCode(j.at("baseReg").get<string>());
-        imm = j.contains("offset") ? parseImmediate(j.at("offset")) : 0;
-    } else if (j.contains("rs")) {
-        rs = getRegisterCode(j.at("rs").get<string>());
-        imm = j.contains("immediate") ? parseImmediate(j.at("immediate")) : 0;
-    } else if (j.contains("base")) {
-        const string lbl = j.at("base").get<string>();
-        if (!dataMap.count(lbl)) {
-            throw runtime_error("Label de dados desconhecida em PRINT: " + lbl);
-        }
-        imm = static_cast<int16_t>(dataMap[lbl] & 0xFFFF);
-    } else if (j.contains("address")) {
-        imm = parseImmediate(j.at("address"));
-    } else if (j.contains("immediate")) {
-        imm = parseImmediate(j.at("immediate"));
-    }
-
-    return buildBinaryInstruction(opcode, rs, rt, 0, 0, 0, imm, 0);
 }

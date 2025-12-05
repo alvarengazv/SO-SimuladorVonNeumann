@@ -12,7 +12,13 @@
 #include <functional>
 #include <mutex>
 #include <condition_variable>
+#include <thread>
+#include <bitset>
+#include <fstream>
 
+#include "MemoryManager.hpp"
+#include "PCB.hpp"
+#include "../IO/IOManager.hpp"
 #include "datapath/REGISTER_BANK.hpp" // Incluído diretamente para ter a definição completa
 #include "datapath/ULA.hpp"
 #include "datapath/HASH_REGISTER.hpp"
