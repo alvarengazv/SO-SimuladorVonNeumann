@@ -22,7 +22,7 @@
     { "instruction": "print", "rt": "$t2" },
     
     { "instruction": "addi", "rt": "$t0", "rs": "$t0", "immediate": 1 },
-    { "instruction": "j", "label": "copy_loop" },
+    { "instruction": "j", "dest": "copy_loop" },
 
     { "label": "done", "instruction": "end" }
   ]

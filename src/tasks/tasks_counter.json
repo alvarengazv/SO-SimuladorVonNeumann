@@ -10,7 +10,7 @@
     { "instruction": "print", "rt": "$t0" },
     { "instruction": "addi", "rt": "$t0", "rs": "$t0", "immediate": -1 },
     { "instruction": "sw", "rt": "$t0", "base": "current" },
-    { "instruction": "j", "label": "loop_start" },
+    { "instruction": "j", "dest": "loop_start" },
     { "label": "end_prog", "instruction": "end" }
   ]
 }

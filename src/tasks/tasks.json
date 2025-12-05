@@ -36,17 +36,17 @@
     { "instruction": "sw", "rt": "$s3", "offset": 1, "base": "result" },
 
     { "label": "loop", "instruction": "lw", "rt": "$t8", "base": "counter" },
-    { "instruction": "beq", "rs": "$t8", "rt": "$zero", "offset": 4 },
+    { "instruction": "beq", "rs": "$t8", "rt": "$zero", "dest": "end_loop" },
     { "instruction": "addi", "rt": "$t8", "rs": "$t8", "immediate": -1 },
     { "instruction": "sw", "rt": "$t8", "base": "counter" },
-    { "instruction": "j", "label": "loop" },
+    { "instruction": "j", "dest": "loop" },
     { "label": "end_loop", "instruction": "print", "rt": "$t8" },
 
-    { "instruction": "bgt", "rs": "$t0", "rt": "$t1", "offset": 2 },
-    { "instruction": "blt", "rs": "$t0", "rt": "$t1", "offset": 4 },
+    { "instruction": "bgt", "rs": "$t1", "rt": "$t0", "dest": "greater_case" },
+    { "instruction": "blt", "rs": "$t1", "rt": "$t0", "dest": "less_case" },
 
     { "label": "greater_case", "instruction": "li", "rt": "$a0", "immediate": 111 },
-    { "instruction": "j", "label": "after_compare" },
+    { "instruction": "j", "dest": "after_compare" },
 
     { "label": "less_case", "instruction": "li", "rt": "$a0", "immediate": 222 },
 
