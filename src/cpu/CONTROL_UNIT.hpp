@@ -58,6 +58,13 @@ struct Control_Unit {
     hw::Map map;
     std::map<string, int32_t> exMemFwd;
     std::map<string, int32_t> memWbFwd;
+    std::atomic<int> global_epoch{0};
+
+    // Simple load-use hazard tracking (per Control_Unit/Core instance)
+    std::atomic<bool> loadHazardActive{false};
+    std::string loadHazardReg;
+    mutable std::mutex loadHazardMutex;
+    mutable std::mutex pc_mutex;
 
     std::unordered_map<string, string> instructionMap = {
         {"add", "000000"}, {"and", "000001"}, {"div", "000010"}, {"mult","000011"},
@@ -75,7 +82,7 @@ struct Control_Unit {
     // Assinatura corrigida para corresponder à implementação
     string Identificacao_instrucao(uint32_t instruction);
 
-    uint32_t FetchInstruction(ControlContext &context);
+    uint32_t FetchInstruction(ControlContext &context, int &capturedEpoch);
     void Decode(uint32_t instruction, Instruction_Data &data);
     void Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &d);
     void Execute_Operation(Instruction_Data &data, ControlContext &context);
@@ -91,6 +98,9 @@ struct Control_Unit {
                                     Instruction_Data &current,
                                     ControlContext &context,
                                     int32_t &value);
+    void markLoadHazard(const std::string &regName);
+    void clearLoadHazard(const std::string &regName);
+    bool isLoadHazardFor(const Instruction_Data &data) const;
     std::mutex forwardingMutex;
     std::condition_variable forwardingCv;
 };

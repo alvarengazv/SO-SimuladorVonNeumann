@@ -1,5 +1,6 @@
 // control_unit_with_trace.cpp
 #include "CONTROL_UNIT.hpp"
+#include <chrono>
 
 using namespace std;
 
@@ -128,6 +129,36 @@ bool Control_Unit::readRegisterWithForwarding(const std::string &name,
     return true;
 }
 
+void Control_Unit::markLoadHazard(const std::string &regName) {
+    if (regName.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    loadHazardReg = regName;
+    loadHazardActive.store(true, std::memory_order_release);
+}
+
+void Control_Unit::clearLoadHazard(const std::string &regName) {
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    if (!regName.empty() && regName != loadHazardReg) {
+        return;
+    }
+    loadHazardReg.clear();
+    loadHazardActive.store(false, std::memory_order_release);
+}
+
+bool Control_Unit::isLoadHazardFor(const Instruction_Data &data) const {
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    if (!loadHazardActive.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (loadHazardReg.empty()) {
+        return false;
+    }
+    return (data.sourceRegisterName == loadHazardReg) ||
+           (data.targetRegisterName == loadHazardReg);
+}
+
 string Control_Unit::Get_immediate(const uint32_t instruction) {
     uint16_t imm = static_cast<uint16_t>(instruction & 0xFFFFu);
     return std::bitset<16>(imm).to_string();
@@ -191,8 +222,13 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
     }
 }
 
-uint32_t Control_Unit::FetchInstruction(ControlContext &context) {
+uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEpoch) {
     account_stage(context.process);
+
+    std::lock_guard<std::mutex> lock(pc_mutex);
+
+    capturedEpoch = global_epoch.load(std::memory_order_relaxed);
+
     uint32_t pcValue = context.registers.pc.read();
     context.registers.mar.write(pcValue);
     uint32_t instr = context.memManager.read(pcValue, context.process);
@@ -486,9 +522,19 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
     else if (data.op == "BLT") { alu.op = BLT; alu.calculate(); jump = (alu.result == 1); }
     else if (data.op == "BGT") { alu.op = BGT; alu.calculate(); jump = (alu.result == 1); }
 
-    if (jump && !data.addressRAMResult.empty()) {
-        uint32_t addr = binaryStringToUint(data.addressRAMResult);
-        context.registers.pc.write(addr);
+    if (jump) {
+        std::lock_guard<std::mutex> lock(pc_mutex);
+
+        global_epoch.fetch_add(1, std::memory_order_relaxed);
+        if (data.op == "J" && !data.addressRAMResult.empty()) {
+            uint32_t addr = binaryStringToUint(data.addressRAMResult);
+            context.registers.pc.write(addr);
+        } else {
+            int32_t offset = data.immediate;
+            uint32_t nextPc = context.registers.pc.read();
+            uint32_t target = static_cast<uint32_t>(nextPc + (offset << 2));
+            context.registers.pc.write(target);
+        }
         FlushPipeline(context);
         context.endProgram.store(false, std::memory_order_relaxed);
     }
@@ -574,6 +620,7 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
             data.pendingMemoryRead = false;
             memWbFwd[data.writeRegisterName] = value;
         }
+        clearLoadHazard(data.writeRegisterName);
         forwardingCv.notify_all();
     }
 
@@ -639,6 +686,10 @@ void Control_Unit::FlushPipeline(ControlContext &context) {
     if (context.flushPipeline) {
         context.flushPipeline();
     }
+
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    loadHazardReg.clear();
+    loadHazardActive.store(false, std::memory_order_release);
 }
 
 // A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
@@ -647,6 +698,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
 
     std::atomic<bool> endProgram{false};
     std::atomic<bool> endExecution{false};
+    std::mutex pcMutex;
 
     ControlContext context{ process.regBank, memoryManager, *ioRequests, printLock, process, endProgram, endExecution };
 
@@ -659,6 +711,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
         ifId.flush();
         idEx.flush();
     };
+
 
     std::atomic<int> issuedCycles{0};
 
@@ -676,7 +729,9 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
                 break;
             }
 
-            uint32_t instruction = UC.FetchInstruction(context);
+            int fetchEpoch = 0;
+
+            uint32_t instruction = UC.FetchInstruction(context, fetchEpoch);
             if (context.endProgram.load(std::memory_order_relaxed)) {
                 drainSent = true;
                 ifId.push(makeDrainToken(true));
@@ -685,6 +740,9 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
 
             PipelineToken token;
             token.entry = &UC.data.emplace_back();
+
+            token.entry->epoch = fetchEpoch;
+                
             token.valid = true;
             token.instruction = instruction;
             ifId.push(token);
@@ -714,8 +772,29 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             if (!token.valid) {
                 continue;
             }
+
+            int local_epoch = token.entry->epoch;
+            if (local_epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                continue;
+            }
+
             account_stage(context.process);
             UC.Decode(token.instruction, *token.entry);
+
+            token.entry->epoch = local_epoch;
+
+            if (local_epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                continue;
+            }
+
+            while (UC.isLoadHazardFor(*token.entry)) {
+                std::this_thread::sleep_for(std::chrono::microseconds(20));
+            }
+
+            if (token.entry->op == "LW" && !token.entry->targetRegisterName.empty()) {
+                UC.markLoadHazard(token.entry->targetRegisterName);
+            }
+
             token.instruction = 0;
             idEx.push(token);
         }
@@ -731,6 +810,11 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             if (!token.valid) {
                 continue;
             }
+
+            if (token.entry->epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                continue;
+            }
+
             UC.Execute(*token.entry, context);
             exMem.push(token);
         }

@@ -8,6 +8,7 @@
 using namespace std;
 
 struct Instruction_Data {
+    int epoch = 0;
     string source_register;
     string target_register;
     string destination_register;
