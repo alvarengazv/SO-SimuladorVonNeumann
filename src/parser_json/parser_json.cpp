@@ -169,16 +169,16 @@ uint32_t encodeIType(const json &j, int pcIdx){
     if (mnem=="beq" || mnem=="bne" || mnem=="bgt" || mnem=="blt"){
         rs = getRegisterCode(j.at("rs").get<string>());
         rt = getRegisterCode(j.at("rt").get<string>());
-        // if (j.contains("label")){
-        //     const string lbl = j.at("label").get<string>();
-        //     if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
-        //     imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
-        // }
-        
-        if (j.contains("offset")){
+
+        if (j.contains("dest")){
+            const string lbl = j.at("dest").get<string>();
+            if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
+            imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
+        } else if (j.contains("offset")){
             imm = parseImmediate(j.at("offset"));
+            imm = static_cast<int16_t>(imm - 1);
         } else {
-            throw runtime_error(mnem + " requer 'offset'");
+            throw runtime_error(mnem + " requer 'offset' ou 'label'");
         }
         return buildBinaryInstruction(opcode, rs, rt, 0, 0, 0, imm, 0);
     }
