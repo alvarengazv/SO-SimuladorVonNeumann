@@ -1,4 +1,6 @@
 #include "simulator.hpp"
+#include <filesystem>
+#include <iostream>
 
 namespace {
 std::string schedulerName(int algorithm) {
@@ -14,6 +16,10 @@ std::string schedulerName(int algorithm) {
     default:
         return "First-Come First-Served";
     }
+}
+
+bool isJsonFile(const std::filesystem::path &path) {
+    return path.extension() == ".json";
 }
 } // namespace
 
@@ -46,39 +52,53 @@ int Simulator::run() {
 }
 
 bool Simulator::loadProcesses() {
-    struct ProcessDefinition {
-        std::string pcbFile;
-        std::string taskLabel;
-        std::string taskFile;
-    };
-
-    const std::vector<ProcessDefinition> definitions = {
-        {"src/pcbs/process1.json", "tasks.json", "src/tasks/tasks.json" },
-        {"src/pcbs/process2.json", "tasks_counter.json", "src/tasks/tasks_counter.json" },
-        {"src/pcbs/process3.json", "tasks_io.json", "src/tasks/tasks_io.json" },
-        {"src/pcbs/process_forward.json", "tasks_forward.json", "src/tasks/tasks_forward.json" }};
+    const std::string tasksDir = "src/tasks";
+    
+    if (!std::filesystem::exists(tasksDir)) {
+        std::cerr << "Erro: Diretório '" << tasksDir << "' não encontrado.\n";
+        return false;
+    }
 
     bool allLoaded = true;
-    for (const auto &definition : definitions) {
-        allLoaded &= loadProcessDefinition(definition.pcbFile,
-                           definition.taskLabel,
-                           definition.taskFile,
-                          0x00000000 );
+    int processCount = 0;
+
+    try {
+        for (const auto &entry : std::filesystem::directory_iterator(tasksDir)) {
+            if (entry.is_regular_file() && isJsonFile(entry.path())) {
+                std::string taskFile = entry.path().string();
+                std::string taskLabel = entry.path().filename().string();
+
+                std::cout << "Carregando task: " << taskLabel << "\n";
+                
+                allLoaded &= loadProcessDefinition(
+                    taskLabel,
+                    taskFile,
+                    0x00000000
+                );
+                processCount++;
+            }
+        }
+
+        if (processCount == 0) {
+            std::cerr << "Aviso: Nenhum arquivo .json encontrado em '" << tasksDir << "'.\n";
+            return false;
+        }
+
+        std::cout << "Total de " << processCount << " tasks carregadas com sucesso.\n";
+    } catch (const std::filesystem::filesystem_error &e) {
+        std::cerr << "Erro ao acessar diretório '" << tasksDir << "': " << e.what() << "\n";
+        return false;
     }
+
     return allLoaded;
 }
 
-bool Simulator::loadProcessDefinition(const std::string &pcbFile,
+bool Simulator::loadProcessDefinition(
                                        const std::string &taskLabel,
                                        const std::string &taskFile,
                                        uint32_t baseAddress) {
     auto process = std::make_unique<PCB>();
-    if (!load_pcb_from_json(pcbFile, *process)) {
-        std::cerr << "Erro ao carregar '" << pcbFile
-                  << "'. Certifique-se de que o arquivo está na pasta raiz do projeto.\n";
-        return false;
-    }
-
+    
     std::cout << "Carregando programa '" << taskLabel << "' para o processo " << process->pid << "...\n";
     int startCodeAddr = loadJsonProgram(taskFile, memManager, *process, baseAddress);
 

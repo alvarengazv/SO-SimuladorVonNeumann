@@ -1,4 +1,10 @@
 {
+  "pcb":{
+    "pid": 1,
+    "name": "processo_teste_1",
+    "quantum": 0,
+    "priority": 0
+  },
   "metadata": {
     "task_id": "prog_full_test",
     "author": "grupoPeripherals",

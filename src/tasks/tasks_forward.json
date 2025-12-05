@@ -1,8 +1,15 @@
 {
+  "pcb":{
+    "pid": 3,
+    "name": "io_bound_sim",
+    "quantum": 0,
+    "priority": 0
+  },
   "metadata": {
     "task_id": "cadeia_forwarding",
     "author": "teste",
     "description": "Sequência LW seguida de aritmética dependente, testando o mecanismo de forwarding."
+
   },
   "data": {
     "vec": [3, 6, 9, 12],

@@ -1,5 +1,14 @@
 {
-  "metadata": { "task_id": "counter_test", "description": "Contagem regressiva simples" },
+  "pcb":{
+    "pid": 2,
+    "name": "contador_loop",
+    "quantum": 0,
+    "priority": 0
+  },
+  "metadata": { 
+    "task_id": "counter_test",
+    "description": "Contagem regressiva simples"
+  },
   "data": { "start_val": 20, "current": 0 },
   "program": [
     { "instruction": "lw", "rt": "$t0", "offset": 0, "base": "start_val" },

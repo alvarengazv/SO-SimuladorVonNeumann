@@ -13,6 +13,8 @@
 #include <atomic>
 #include <queue>
 #include <ctime>
+#include <filesystem>
+#include <stdexcept>
 
 #include "../cpu/CONTROL_UNIT.hpp"
 #include "../cpu/pcb_loader.hpp"
@@ -33,7 +35,7 @@ public:
 
 private:
     bool loadProcesses();
-    bool loadProcessDefinition(const std::string &pcbFile,
+    bool loadProcessDefinition(
                                const std::string &taskLabel,
                                const std::string &taskFile,
                                uint32_t baseAddress = 0);

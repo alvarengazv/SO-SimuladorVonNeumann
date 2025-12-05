@@ -1,5 +1,14 @@
 {
-  "metadata": { "task_id": "mem_ops", "description": "Transferencia de dados memoria" },
+  "pcb":{
+    "pid": 3,
+    "name": "io_bound_sim",
+    "quantum": 0,
+    "priority": 0
+  },
+  "metadata": { 
+    "task_id": "mem_ops", 
+    "description": "Transferencia de dados memoria"
+  },
   "data": { 
       "src_array": [10, 20, 30, 40, 50],
       "dst_array": [0, 0, 0, 0, 0],
