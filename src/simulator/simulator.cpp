@@ -61,6 +61,7 @@ bool Simulator::loadProcesses() {
 
     bool allLoaded = true;
     int processCount = 0;
+    uint32_t nextBaseAddr = 0x00000000; // simple linear base; MemoryManager will map per-process
 
     try {
         for (const auto &entry : std::filesystem::directory_iterator(tasksDir)) {
@@ -70,12 +71,17 @@ bool Simulator::loadProcesses() {
 
                 std::cout << "Carregando task: " << taskLabel << "\n";
                 
+                // Assign unique PID and non-overlapping base address per task
+                // Note: PCB pid is set inside loadProcessDefinition via the PCB instance
                 allLoaded &= loadProcessDefinition(
                     taskLabel,
                     taskFile,
-                    0x00000000
+                    nextBaseAddr,
+                    ++processCount
                 );
-                processCount++;
+                // // Advance base address by a page-aligned chunk to avoid overlap across tasks
+                // // Assuming 4KB pages; bump by 0x10000 for generous separation
+                nextBaseAddr += 0x00010000;
             }
         }
 
@@ -96,8 +102,10 @@ bool Simulator::loadProcesses() {
 bool Simulator::loadProcessDefinition(
                                        const std::string &taskLabel,
                                        const std::string &taskFile,
-                                       uint32_t baseAddress) {
+                                       uint32_t baseAddress, 
+                                       int pid) {
     auto process = std::make_unique<PCB>();
+    process->pid = pid;
     
     std::cout << "Carregando programa '" << taskLabel << "' para o processo " << process->pid << "...\n";
     int startCodeAddr = loadJsonProgram(taskFile, memManager, *process, baseAddress);
@@ -171,7 +179,7 @@ void Simulator::executeProcesses() {
         int coreIdx = idleCoresIdx.front();
         idleCoresIdx.pop();
         coreAssignments[coreIdx] = currentProcess;
-        cpuCores[coreIdx]->submitProcess(currentProcess);
+        cpuCores[coreIdx]->submitProcess(currentProcess, false);
         currentProcess->coresAssigned.push_back(coreIdx);
         {
             std::lock_guard<std::mutex> lock(printMutex);

@@ -1,23 +1,5 @@
 // control_unit_with_trace.cpp
-#include "pcb_loader.hpp"
-#include <fstream>
 #include "CONTROL_UNIT.hpp"
-#include "MemoryManager.hpp"
-#include "PCB.hpp"
-#include "../IO/IOManager.hpp"
-
-#include <bitset>
-#include <cmath>
-#include <stdexcept>
-#include <iostream>
-#include <algorithm>
-#include <sstream>
-#include <vector>
-#include <fstream>
-#include <mutex>
-#include <atomic>
-#include <condition_variable>
-#include <thread>
 
 using namespace std;
 
@@ -434,7 +416,7 @@ void Control_Unit::Execute_Aritmetic_Operation(ControlContext &context, Instruct
         data.writesRegister = true;
         data.hasAluResult = true;
         data.aluResult = alu.result;
-        exMemFwd[name_rt] = alu.result;
+        exMemFwd[name_rd] = alu.result;
     }
     forwardingCv.notify_all();
 
@@ -467,10 +449,10 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
             std::cout << "[PRINT-REQ] PRINT REG " << name << " value=" << value
                       << " (pid=" << context.process.pid << ")\n";
 
-            if (context.printLock.load(std::memory_order_relaxed)) {
-                context.process.state.store(State::Blocked);
-                context.endExecution.store(true);
-            }
+            // if (context.printLock.load(std::memory_order_relaxed)) {
+            //     context.process.state.store(State::Blocked);
+            //     context.endExecution.store(true);
+            // }
         }
     }
 }
@@ -612,10 +594,10 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
             context.ioRequests.push_back(std::move(req));
         }
 
-        if (context.printLock.load(std::memory_order_relaxed)) {
-            context.process.state.store(State::Blocked);
-            context.endExecution.store(true);
-        }
+        // if (context.printLock.load(std::memory_order_relaxed)) {
+        //     context.process.state.store(State::Blocked);
+        //     context.endExecution.store(true);
+        // }
     }
 }
 
