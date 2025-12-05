@@ -33,7 +33,7 @@ public:
     // Função auxiliar para o write-back da cache
     void writeToPhysical(uint32_t address, uint32_t data, PCB &process);
 
-    uint32_t readFromPhysical(uint32_t logicalAddress, PCB &process);
+    uint32_t readFromPhysical(uint32_t physicalAddress, PCB &process);
     void freeProcessPages(PCB &process);
 
 private:

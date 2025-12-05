@@ -21,8 +21,10 @@ uint32_t MemoryManager::read(uint32_t logicalAddress, PCB &process)
     process.mem_accesses_total.fetch_add(1);
     process.mem_reads.fetch_add(1);
 
-    // A cache já trata o mapeamento lógico → físico internamente
-    uint32_t data = L1_cache->read(logicalAddress, this, process);
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    uint32_t data = L1_cache->read(physicalAddress, this, process);
+
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 
@@ -46,7 +48,10 @@ void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB &process)
     process.mem_accesses_total.fetch_add(1);
     process.mem_writes.fetch_add(1);
 
-    L1_cache->write(logicalAddress, data, this, process);
+    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    L1_cache->write(physicalAddress, data, this, process);
+
     std::cout << "Escrevendo na memória através da cache\n";
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
@@ -138,11 +143,10 @@ void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB
 }
 
 // Função chamada pela cache para read, ou seja, leitura na memória física diretamente
-uint32_t MemoryManager::readFromPhysical(uint32_t logicalAddress, PCB &process)
+uint32_t MemoryManager::readFromPhysical(uint32_t physicalAddress, PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
 
-    uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
     uint32_t data = MEMORY_ACCESS_ERROR;
 
     if (physicalAddress < mainMemoryLimit)
