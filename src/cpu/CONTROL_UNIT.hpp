@@ -66,14 +66,6 @@ struct Control_Unit {
     mutable std::mutex loadHazardMutex;
     mutable std::mutex pc_mutex;
 
-    std::unordered_map<string, string> instructionMap = {
-        {"add", "000000"}, {"and", "000001"}, {"div", "000010"}, {"mult","000011"},
-        {"sub", "000100"}, {"beq", "000101"}, {"bne", "000110"}, {"bgt", "000111"},
-        {"bgti","001000"}, {"blt", "001001"}, {"blti","001010"}, {"j", "001011"},
-        {"lw", "001100"},  {"sw", "001101"},  {"li", "001110"},  {"la", "001111"},
-        {"print", "010000"},{"end", "111111"}
-    };
-
     static string Get_immediate(uint32_t instruction);
     static string Get_destination_Register(uint32_t instruction);
     static string Get_target_Register(uint32_t instruction);

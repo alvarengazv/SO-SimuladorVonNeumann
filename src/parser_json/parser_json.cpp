@@ -13,11 +13,14 @@ using nlohmann::json;
 
 // ======= Tabelas (sem alterações) =======
 const unordered_map<string, int> instructionMap = {
-    {"add",0}, {"sub",0}, {"and",0}, {"or",0}, {"mult",0}, {"div",0}, {"sll",0}, {"srl",0}, {"jr",0},
-    {"addi",0b001000}, {"andi",0b001100}, {"ori",0b001101}, {"slti",0b001010},
-    {"lw",0b100011}, {"sw",0b101011}, {"beq",0b000100}, {"bne",0b000101},
-    {"bgt",0b000111}, {"blt",0b001001}, {"li",0b001111}, {"print",0b010000}, {"end",0b111111},
-    {"j",0b000010}, {"jal",0b000011}
+    {"add", 0}, {"sub", 0}, {"and", 0}, {"or", 0}, 
+    {"mult", 0}, {"div", 0}, {"sll", 0}, {"srl", 0}, {"jr", 0},
+
+    // I-Type and J-Type opcodes remain the same
+    {"addi", 0b001000}, {"andi", 0b001100}, {"ori", 0b001101}, {"slti", 0b001010},
+    {"lw", 0b100011}, {"sw", 0b101011}, {"beq", 0b000100}, {"bne", 0b000101},
+    {"bgt", 0b000111}, {"blt", 0b001001}, {"li", 0b001111}, {"print", 0b010000}, 
+    {"end", 0b111111}, {"j", 0b000010}, {"jal", 0b000011}
 };
 
 const unordered_map<string, int> functMap = {
@@ -128,7 +131,7 @@ uint32_t encodeRType(const json &j){
     return buildBinaryInstruction(opcode, rs, rt, rd, sh, funct, 0, 0);
 }
 
-uint32_t encodeIType(const json &j, int pcIdx){
+uint32_t encodeIType(const json &j, int currentAddress){
     string mnem = j.at("instruction").get<string>();
     int opcode  = getOpcode(mnem);
     int rs=0, rt=0; int16_t imm=0;
@@ -173,7 +176,13 @@ uint32_t encodeIType(const json &j, int pcIdx){
         if (j.contains("dest")){
             const string lbl = j.at("dest").get<string>();
             if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
-            imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
+            // imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
+
+            int targetAddr = labelMap[lbl];
+            int pcPlus4 = currentAddress + 4;
+            int offsetBytes = targetAddr - pcPlus4;
+            imm = static_cast<int16_t>(offsetBytes / 4);
+
         } else if (j.contains("offset")){
             imm = parseImmediate(j.at("offset"));
             imm = static_cast<int16_t>(imm - 1);
@@ -193,11 +202,12 @@ uint32_t encodeJType(const json &j){
     const string mnem = j.at("instruction").get<string>();
     int opcode = getOpcode(mnem);
 
-    if (j.contains("label")){
-        const string lbl = j.at("label").get<string>();
+    if (j.contains("dest")){
+        const string lbl = j.at("dest").get<string>();
         if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida (J): " + lbl);
-        int addr = labelMap[lbl] & 0x03FFFFFF;
-        return buildBinaryInstruction(opcode, 0,0,0,0,0, 0, addr);
+        
+        int addr = labelMap[lbl]; 
+        return buildBinaryInstruction(opcode, 0,0,0,0,0, 0, (addr & 0x03FFFFFF));
     }
     if (j.contains("address")){
         uint32_t addr=0;
@@ -209,7 +219,7 @@ uint32_t encodeJType(const json &j){
         }
         return buildBinaryInstruction(opcode, 0,0,0,0,0, 0, (addr & 0x03FFFFFF));
     }
-    throw runtime_error("J-type requer 'label' ou 'address'");
+    throw runtime_error("J-type requer 'dest' ou 'address'");
 }
 
 uint32_t encodePrintInstruction(const json &j) {
@@ -268,7 +278,10 @@ int parseData(const json &dataJson, MemoryManager &memManager, PCB& pcb, int sta
         for (auto it = dataJson.begin(); it != dataJson.end(); ++it){
             const string key = it.key();
             const json& val  = it.value();
+            
             dataMap[key] = addr;
+            // std::cout << "[DEBUG] Data Label '" << key << "' mapped to: 0x" << std::hex << addr << std::dec << "\n";
+
             if (val.is_array()){
                 for (auto &e : val){
                     int w = e.is_string()? static_cast<int>(std::stoul(e.get<string>(),nullptr,0))
@@ -300,7 +313,10 @@ int parseData(const json &dataJson, MemoryManager &memManager, PCB& pcb, int sta
         for (const auto &item : dataJson){
             string type = toLower(item.value("type","word"));
             string label = item.value("label", string());
-            if (!label.empty()) dataMap[label] = addr;
+            if (!label.empty()) {
+                dataMap[label] = addr;
+                // std::cout << "[DEBUG] Data Label '" << label << "' mapped to: 0x" << std::hex << addr << std::dec << "\n";
+            }
 
             if (type=="word"){
                 flushBytes();
@@ -344,7 +360,9 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
     int instruction_address_counter = 0;
     for (const auto &node : programJson) {
         if (node.contains("label")) {
-            labelMap[node["label"].get<string>()] = instruction_address_counter;
+            string lbl = node["label"].get<string>();
+            labelMap[lbl] = startAddr + (instruction_address_counter * 4);
+            // std::cout << "[DEBUG] Code Label '" << lbl << "' mapped to: 0x" << std::hex << labelMap[lbl] << std::dec << "\n";
         }
         if (node.contains("instruction")) {
             instruction_address_counter++;
@@ -353,13 +371,14 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
 
     pcb.instructions = instruction_address_counter;
     int current_mem_addr = startAddr;
-    int current_instruction_addr = 0;
+    
     for (const auto &node : programJson) {
         if (!node.contains("instruction")) {
             continue;
         }
         
-        uint32_t binary_instruction = parseInstruction(node, current_instruction_addr);
+        uint32_t binary_instruction = parseInstruction(node, current_mem_addr);
+        
         std::cout << "Instrução " << node.at("instruction").get<string>() << " carregada na memória: 0x" 
                   << std::hex << current_mem_addr << " : 0x" 
                   << std::setw(8) << std::setfill('0') << binary_instruction << std::dec << std::endl;
@@ -367,7 +386,6 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
         memManager.loadProcessData(current_mem_addr, binary_instruction, pcb); // Alterado aqui
         
         current_mem_addr += 4;
-        current_instruction_addr++;
     }
     // std::cin >> std::ws; // Espera por Enter para continuar
     return current_mem_addr;
@@ -390,10 +408,14 @@ int loadJsonProgram(const string &filename, MemoryManager &memManager, PCB& pcb,
         pcb.name = j["metadata"].value("name", std::string(""));
     }
 
-    if (j.contains("data"))    
+    if (j.contains("data"))    {
+        // std::cout << "[DEBUG] Parsing Data Section at 0x" << std::hex << addr << std::dec << "\n";
         addr = parseData(j["data"], memManager, pcb, addr);
+    }
     int codeStart = addr;
-    if (j.contains("program")) 
+    if (j.contains("program")) {
+        // std::cout << "[DEBUG] Parsing Code Section at 0x" << std::hex << codeStart << std::dec << "\n";
         addr = parseProgram(j["program"], memManager, pcb, addr);
+    }
     return codeStart;
 }
