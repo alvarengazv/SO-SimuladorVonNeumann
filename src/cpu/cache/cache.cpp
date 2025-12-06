@@ -26,12 +26,14 @@ Cache::~Cache() {
 }
 
 // Decodifica endereço em tag e offset, retornando struct AddressDecoded
-AddressDecoded Cache::decodeAddress(uint32_t address) const {
+AddressDecoded Cache::decodeAddress(uint32_t address, int pid) const {
     size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
 
     AddressDecoded info;
-
-    info.tag = address / blockSizeBytes;
+    // Include PID in tag to provide cache isolation between processes
+    // Shift PID to upper bits and combine with block address
+    size_t blockAddr = address / blockSizeBytes;
+    info.tag = (static_cast<size_t>(pid) << 24) | blockAddr;
     info.wordOffset = (address % blockSizeBytes) / sizeof(uint32_t);
 
     return info;
@@ -41,7 +43,7 @@ AddressDecoded Cache::decodeAddress(uint32_t address) const {
 uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
     std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
-    AddressDecoded info = decodeAddress(address);
+    AddressDecoded info = decodeAddress(address, process.pid);
 
     auto it = blockTagToLine.find(info.tag);
     if (it != blockTagToLine.end()) {
@@ -70,7 +72,7 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
 void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& process) {
     std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
-    AddressDecoded info = decodeAddress(address);
+    AddressDecoded info = decodeAddress(address, process.pid);
 
     auto it = blockTagToLine.find(info.tag);
     size_t lineIndex;
@@ -103,7 +105,9 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
     CacheLine& line = lines[lineIndex];
 
     size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
-    uint32_t baseAddress = blockTag * blockSizeBytes;
+    // Extract the address part from the tag (lower 24 bits) since upper bits contain PID
+    uint32_t blockAddr = blockTag & 0xFFFFFF;
+    uint32_t baseAddress = blockAddr * blockSizeBytes;
 
     for (size_t i = 0; i < wordsPerLine; i++) {
         uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
@@ -131,7 +135,9 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
     if (line.valid && line.dirty) {
         size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
-        uint32_t baseAddress = line.tag * blockSizeBytes;
+        // Extract the address part from the tag (lower 24 bits) since upper bits contain PID
+        uint32_t blockAddr = line.tag & 0xFFFFFF;
+        uint32_t baseAddress = blockAddr * blockSizeBytes;
 
         for (size_t i = 0; i < wordsPerLine; ++i) {
             uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));

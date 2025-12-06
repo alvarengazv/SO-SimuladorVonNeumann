@@ -20,7 +20,7 @@ class MemoryManager;
 class PCB;
 
 struct AddressDecoded {
-    size_t tag;         // Qual bloco é?
+    size_t tag;         // Qual bloco é? (inclui PID para isolamento)
     size_t wordOffset;  // Qual palavra dentro do bloco?
 };
 
@@ -56,7 +56,7 @@ class Cache {
     ReplacementPolicy currentPolicy;
     CachePolicy policyHandler;
 
-    AddressDecoded decodeAddress(uint32_t address) const;
+    AddressDecoded decodeAddress(uint32_t address, int pid) const;
 
     int cache_hits;
     int cache_misses;
