@@ -93,7 +93,6 @@ void ProcessScheduler::setTickets()
         int scaled = static_cast<int>((static_cast<double>(p->instructions) / maxInstr) * maxTickets + 0.5);
         if (scaled < minTickets) scaled = minTickets;
         p->tickets = scaled;
-        std::cout << "Tickets atribuido para o processo: " << p->name << " -> " << p->tickets << " (instructions=" << p->instructions << ")\n";
     }
 }
 
@@ -183,7 +182,6 @@ PCB *ProcessScheduler::lotterySelect(const std::vector<PCB *> &readyQueue)
     {
         uint64_t t = std::max(1, p->tickets);
         if (pick <= t)
-            cout << "Processo selecionado na loteria: " << p->name << " com " << p->tickets << " tickets.\n";
             return p;
         pick -= t;
     }

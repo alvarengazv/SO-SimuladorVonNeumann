@@ -912,9 +912,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
     memoryThread.join();
     writeThread.join();
 
-    cout << "Somando timestamp: " << process.timeStamp<<" \n";
     process.timeStamp += issuedCycles.load(std::memory_order_relaxed);
-    cout << "Somando timestamp: " << process.timeStamp<<" \n";
 
     if (context.endProgram.load(std::memory_order_relaxed)) {
         process.state.store(State::Finished);
