@@ -178,10 +178,10 @@ uint32_t encodeIType(const json &j, int currentAddress){
             if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
             imm = static_cast<int16_t>(labelMap[lbl] - (currentAddress + 1));
 
-            // int targetAddr = labelMap[lbl];
-            // int pcPlus4 = currentAddress + 4;
-            // int offsetBytes = targetAddr - pcPlus4;
-            // imm = static_cast<int16_t>(offsetBytes / 4);
+            int targetAddr = labelMap[lbl];
+            int pcPlus4 = currentAddress + 4;
+            int offsetBytes = targetAddr - pcPlus4;
+            imm = static_cast<int16_t>(offsetBytes / 4);
 
         } else if (j.contains("offset")){
             imm = parseImmediate(j.at("offset"));
@@ -305,7 +305,7 @@ int parseData(const json &dataJson, MemoryManager &memManager, PCB& pcb, int sta
             for (size_t i=0;i<bytes.size(); i+=4){
                 uint32_t w=0;
                 for (size_t j=0;j<4 && i+j<bytes.size(); ++j) w = (w<<8) | bytes[i+j];
-                memManager.write(addr, w, pcb); // Alterado aqui
+                memManager.loadProcessData(addr, w, pcb); // Alterado aqui
                 addr += 4;
             }
             bytes.clear();
@@ -324,13 +324,13 @@ int parseData(const json &dataJson, MemoryManager &memManager, PCB& pcb, int sta
                     for (auto &v : item["value"]){
                         int w = v.is_string()? static_cast<int>(std::stoul(v.get<string>(),nullptr,0))
                                              : v.get<int>();
-                        memManager.write(addr, w, pcb); // Alterado aqui
+                        memManager.loadProcessData(addr, w, pcb); // Alterado aqui
                         addr += 4;
                     }
                 } else {
                     int w = item["value"].is_string()? static_cast<int>(std::stoul(item["value"].get<string>(),nullptr,0))
                                                       : item["value"].get<int>();
-                    memManager.write(addr, w, pcb); // Alterado aqui
+                    memManager.loadProcessData(addr, w, pcb); // Alterado aqui
                     addr += 4;
                 }
             } else if (type=="byte"){

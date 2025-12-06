@@ -222,7 +222,7 @@ string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
     }
 }
 
-uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEpoch) {
+uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEpoch, uint32_t &fetchedPC) {
     account_stage(context.process);
 
     std::lock_guard<std::mutex> lock(pc_mutex);
@@ -230,6 +230,9 @@ uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEp
     capturedEpoch = global_epoch.load(std::memory_order_relaxed);
 
     uint32_t pcValue = context.registers.pc.read();
+
+    fetchedPC = pcValue;
+
     context.registers.mar.write(pcValue);
     uint32_t instr = context.memManager.read(pcValue, context.process);
     context.registers.ir.write(instr);
@@ -245,7 +248,14 @@ uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEp
 }
 
 void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
+    uint32_t saved_pc = data.pc; 
+    int saved_epoch = data.epoch;
+
     data = Instruction_Data{};
+
+    data.pc = saved_pc;
+    data.epoch = saved_epoch;
+
     data.rawInstruction = instruction;
     data.op = Identificacao_instrucao(instruction);
 
@@ -538,14 +548,19 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
         global_epoch.fetch_add(1, std::memory_order_relaxed);
         if (data.op == "J") {
             // std::cout << "[JUMP] Jumping to address from instruction: "
-                    //   << "0x" << std::hex << binaryStringToUint(data.addressRAMResult) << std::dec << "\n"; 
-            // uint32_t addr = binaryStringToUint(data.addressRAMResult);
-            uint32_t addr = static_cast<uint32_t>(data.immediate);
-            context.registers.pc.write(addr);
+                    //   << "0x" << std::hex << binaryStringToUint(data.addressRAMResult) << std::dec << "\n";
+            // uint32_t addr = static_cast<uint32_t>(data.immediate);
+            // context.registers.pc.write(addr);
+            uint32_t target = static_cast<uint32_t>(data.immediate);
+            context.registers.pc.write(target);
         } else {
             int32_t offset = data.immediate;
-            uint32_t nextPc = context.registers.pc.read();
-            uint32_t target = static_cast<uint32_t>(nextPc + (offset << 2));
+            // uint32_t nextPc = context.registers.pc.read();
+            // uint32_t target = static_cast<uint32_t>(nextPc + (offset << 2));
+            // context.registers.pc.write(target);
+            
+            uint32_t target = (data.pc + 4) + (offset << 2);
+            
             context.registers.pc.write(target);
         }
         FlushPipeline(context);
@@ -754,13 +769,16 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             }
 
             int fetchEpoch = 0;
-            uint32_t instruction = UC.FetchInstruction(context, fetchEpoch);
+            uint32_t fetchedPC = 0;
+
+            uint32_t instruction = UC.FetchInstruction(context, fetchEpoch, fetchedPC);
             
             if (instruction == END_SENTINEL) {
                 // Push END to pipeline speculatively (Execute needs to confirm it)
                 PipelineToken token;
                 token.entry = &UC.data.emplace_back();
                 token.entry->epoch = fetchEpoch;
+                token.entry->pc = fetchedPC;
                 token.valid = true;
                 token.instruction = instruction;
                 ifId.push(token);
@@ -778,7 +796,8 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             token.entry = &UC.data.emplace_back();
 
             token.entry->epoch = fetchEpoch;
-                
+            
+            token.entry->pc = fetchedPC;
             token.valid = true;
             token.instruction = instruction;
             ifId.push(token);

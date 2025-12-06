@@ -74,7 +74,7 @@ struct Control_Unit {
     // Assinatura corrigida para corresponder à implementação
     string Identificacao_instrucao(uint32_t instruction);
 
-    uint32_t FetchInstruction(ControlContext &context, int &capturedEpoch);
+    uint32_t FetchInstruction(ControlContext &context, int &capturedEpoch, uint32_t &fetchedPC);
     void Decode(uint32_t instruction, Instruction_Data &data);
     void Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &d);
     void Execute_Operation(Instruction_Data &data, ControlContext &context);

@@ -30,6 +30,7 @@ struct Instruction_Data {
     int32_t loadResult = 0;
     bool hasLoadResult = false;
     int32_t storeValue = 0;
+    uint32_t pc;
 };
 
 struct PipelineToken {
