@@ -52,7 +52,7 @@ void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB &process)
 
     L1_cache->write(physicalAddress, data, this, process);
 
-    std::cout << "Escrevendo na memória através da cache\n";
+    // std::cout << "Escrevendo na memória através da cache\n";
     process.cache_mem_accesses.fetch_add(1);
     process.memory_cycles.fetch_add(process.memWeights.cache);
 }

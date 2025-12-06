@@ -82,7 +82,7 @@ struct Control_Unit {
     void Execute(Instruction_Data &data, ControlContext &context);
     void Execute_Immediate_Operation(ControlContext &context, Instruction_Data &data);
     void log_operation(const std::string &msg);
-    void Memory_Acess(Instruction_Data &data, ControlContext &context);
+    void Memory_Access(Instruction_Data &data, ControlContext &context);
     void Write_Back(Instruction_Data &data, ControlContext &context);
     void FlushPipeline(ControlContext &context);
     std::string resolveRegisterName(const std::string &bits) const;

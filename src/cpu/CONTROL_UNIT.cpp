@@ -641,7 +641,7 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     }
 }
 
-void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context) {
+void Control_Unit::Memory_Access(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
 
     if (data.pendingMemoryRead && data.hasEffectiveAddress) {
@@ -885,7 +885,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             if (!token.valid) {
                 continue;
             }
-            UC.Memory_Acess(*token.entry, context);
+            UC.Memory_Access(*token.entry, context);
             memWb.push(token);
         }
     });
@@ -940,10 +940,10 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             // Ignora erros durante o dump
         }
 
-        std::cout << "PC = " << context.registers.pc.read() << "\n";
-        std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
-                  << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
-        std::cout << "========================================\n\n";
+        // std::cout << "PC = " << context.registers.pc.read() << "\n";
+        // std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
+        //           << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
+        // std::cout << "========================================\n\n";
     }
 
     return nullptr;

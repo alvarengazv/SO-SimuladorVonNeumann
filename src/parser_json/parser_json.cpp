@@ -379,9 +379,9 @@ int parseProgram(const json &programJson, MemoryManager &memManager, PCB& pcb, i
         
         uint32_t binary_instruction = parseInstruction(node, current_mem_addr);
         
-        std::cout << "Instrução " << node.at("instruction").get<string>() << " carregada na memória: 0x" 
-                  << std::hex << current_mem_addr << " : 0x" 
-                  << std::setw(8) << std::setfill('0') << binary_instruction << std::dec << std::endl;
+        // std::cout << "Instrução " << node.at("instruction").get<string>() << " carregada na memória: 0x" 
+        //           << std::hex << current_mem_addr << " : 0x" 
+        //           << std::setw(8) << std::setfill('0') << binary_instruction << std::dec << std::endl;
         
         memManager.loadProcessData(current_mem_addr, binary_instruction, pcb); // Alterado aqui
         

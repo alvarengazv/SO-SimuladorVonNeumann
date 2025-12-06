@@ -118,8 +118,8 @@ bool Simulator::loadProcessDefinition(
 void Simulator::moveUnblockedProcesses() {
     for (auto it = blockedQueue.begin(); it != blockedQueue.end();) {
         if ((*it)->state.load() == State::Ready) {
-            std::cout << "[Scheduler] Processo " << (*it)->pid
-                      << " desbloqueado e movido para a fila de prontos.\n";
+            // std::cout << "[Scheduler] Processo " << (*it)->pid
+            //           << " desbloqueado e movido para a fila de prontos.\n";
             readyQueue.push_back(*it);
             it = blockedQueue.erase(it);
         } else {
@@ -178,10 +178,10 @@ void Simulator::executeProcesses() {
         currentProcess->coresAssigned.push_back(coreIdx);
         {
             std::lock_guard<std::mutex> lock(printMutex);
-            std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
-                    << " (Quantum: " << currentProcess->quantum
-                    << ") (Prioridade: " << currentProcess->priority << ")"
-                    << ") (Intruções: " << currentProcess->instructions << ").\n";
+            // std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
+            //         << " (Quantum: " << currentProcess->quantum
+            //         << ") (Prioridade: " << currentProcess->priority << ")"
+            //         << ") (Intruções: " << currentProcess->instructions << ").\n";
         }
     }
 
@@ -198,8 +198,8 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
             std::lock_guard<std::mutex> lock(blockedQueueMutex);
             {
                 std::lock_guard<std::mutex> lock(printMutex);
-                std::cout << "[Scheduler] Processo " << process.pid
-                        << " bloqueado por I/O. Entregando ao IOManager.\n";
+                // std::cout << "[Scheduler] Processo " << process.pid
+                //         << " bloqueado por I/O. Entregando ao IOManager.\n";
             }
             ioManager.registerProcessWaitingForIO(&process);
             blockedQueue.push_back(&process);
@@ -208,7 +208,7 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
         case State::Finished:{
             {
                 std::lock_guard<std::mutex> lock(printMutex);
-                std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
+                // std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
                 print_metrics(process);
             }
             memManager.freeProcessPages(process);
@@ -218,8 +218,8 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
         default:{
             {
                 std::lock_guard<std::mutex> lock(printMutex);
-                std::cout << "[Scheduler] Quantum do processo " << process.pid
-                        << " expirou. Voltando para a fila.\n";
+                // std::cout << "[Scheduler] Quantum do processo " << process.pid
+                //         << " expirou. Voltando para a fila.\n";
             }
             std::lock_guard<std::mutex> lock(readyQueueMutex);
             process.state.store(State::Ready);

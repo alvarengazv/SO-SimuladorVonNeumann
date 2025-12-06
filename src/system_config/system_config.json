@@ -19,6 +19,6 @@
         "cores": 4
     },
     "scheduling": {
-        "algorithm": 4
+        "algorithm": 0
     }
 }
