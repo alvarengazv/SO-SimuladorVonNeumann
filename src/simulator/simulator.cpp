@@ -190,6 +190,11 @@ void Simulator::executeProcesses() {
     for (auto &core : cpuCores) {
         core->stop();
     }
+
+    for(auto process : finishedQueue) {
+        print_metrics(*process);
+        memManager.freeProcessPages(*process);
+    }
 }
 
 void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
@@ -207,12 +212,14 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
         }    
         case State::Finished:{
             {
-                std::lock_guard<std::mutex> lock(printMutex);
-                // std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
-                print_metrics(process);
+                std::lock_guard<std::mutex> lock(finishedQueueMutex);
+                finishedQueue.push_back(&process);
             }
-            memManager.freeProcessPages(process);
             finishedProcesses++;
+            // {
+            //     std::lock_guard<std::mutex> lock(printMutex);
+            //     std::cout << "[Scheduler] Processo " << process.pid << " finalizado.\n";
+            // }
             break;
         }
         default:{
@@ -220,8 +227,9 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
                 std::lock_guard<std::mutex> lock(printMutex);
                 // std::cout << "[Scheduler] Quantum do processo " << process.pid
                 //         << " expirou. Voltando para a fila.\n";
+                // cout << "\n\n\n Iniciando preempção de processos \n\n\n";
+
             }
-            cout << "\n\n\n Iniciando preempção de processos \n\n\n";
             std::lock_guard<std::mutex> lock(readyQueueMutex);
             process.state.store(State::Ready);
             readyQueue.push_back(&process);

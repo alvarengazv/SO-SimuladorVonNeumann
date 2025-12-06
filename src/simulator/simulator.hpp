@@ -56,6 +56,8 @@ private:
     mutable std::mutex readyQueueMutex;
     std::vector<PCB *> blockedQueue;
     mutable std::mutex blockedQueueMutex;
+    std::vector<PCB *> finishedQueue;
+    mutable std::mutex finishedQueueMutex;
     std::unique_ptr<ProcessScheduler> scheduler;
     mutable std::mutex printMutex;
     IOManager ioManager;
