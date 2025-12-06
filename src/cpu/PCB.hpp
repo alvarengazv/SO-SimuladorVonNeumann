@@ -37,6 +37,7 @@ struct PageTableEntry {
 
 struct PCB {
     int pid = 0;
+    int tickets = 1;
     std::vector<int> coresAssigned;
     std::string name;
     int quantum = 0;

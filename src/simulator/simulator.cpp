@@ -10,7 +10,7 @@ std::string schedulerName(int algorithm) {
     case 1:
         return "Shortest Job First";
     case 2:
-        return "Shortest Remaining Time";
+        return "Lottery";
     case 3:
         return "Priority";
     default:
@@ -221,6 +221,7 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
                 // std::cout << "[Scheduler] Quantum do processo " << process.pid
                 //         << " expirou. Voltando para a fila.\n";
             }
+            cout << "\n\n\n Iniciando preempção de processos \n\n\n";
             std::lock_guard<std::mutex> lock(readyQueueMutex);
             process.state.store(State::Ready);
             readyQueue.push_back(&process);

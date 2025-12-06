@@ -805,7 +805,7 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             issuedCycles.fetch_add(1, std::memory_order_relaxed);
             account_pipeline_cycle(process);
 
-            if (schedulerId == 0 && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
+            if ((schedulerId == 0 || schedulerId == 2 ) && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
                 endExecution.store(true, std::memory_order_relaxed);
                 break;
             }
@@ -912,7 +912,9 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
     memoryThread.join();
     writeThread.join();
 
+    cout << "Somando timestamp: " << process.timeStamp<<" \n";
     process.timeStamp += issuedCycles.load(std::memory_order_relaxed);
+    cout << "Somando timestamp: " << process.timeStamp<<" \n";
 
     if (context.endProgram.load(std::memory_order_relaxed)) {
         process.state.store(State::Finished);
