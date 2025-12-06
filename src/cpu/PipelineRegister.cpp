@@ -32,13 +32,29 @@ void PipelineRegister::flush() {
 
 void PipelineRegister::stop() {
     std::lock_guard<std::mutex> lock(mutex_);
+    // Notifica quaisquer wait() sem descartar um token possivelmente em trânsito. Isso é
+    // usado para desfazer threads em preempção/desmontagem. Limpar o token aqui
+    // pode descartar trabalho; mantenha-o intacto e apenas sinalize a parada.
     stopped_ = true;
-    hasToken_ = false;
-    stored_ = PipelineToken{};
     cv_.notify_all();
 }
 
 bool PipelineRegister::empty() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return !hasToken_;
+}
+
+bool PipelineRegister::debugHasToken() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return hasToken_;
+}
+
+bool PipelineRegister::debugStopped() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stopped_;
+}
+
+PipelineToken PipelineRegister::debugPeek() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stored_;
 }

@@ -49,6 +49,11 @@ public:
     void stop();
     bool empty() const;
 
+    // Auxiliares de debug (somente leitura, thread-safe)
+    bool debugHasToken() const;
+    bool debugStopped() const;
+    PipelineToken debugPeek() const;
+
 private:
     mutable std::mutex mutex_;
     std::condition_variable cv_;
