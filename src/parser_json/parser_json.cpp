@@ -176,12 +176,12 @@ uint32_t encodeIType(const json &j, int currentAddress){
         if (j.contains("dest")){
             const string lbl = j.at("dest").get<string>();
             if (!labelMap.count(lbl)) throw runtime_error("Label desconhecida: " + lbl);
-            // imm = static_cast<int16_t>(labelMap[lbl] - (pcIdx + 1));
+            imm = static_cast<int16_t>(labelMap[lbl] - (currentAddress + 1));
 
-            int targetAddr = labelMap[lbl];
-            int pcPlus4 = currentAddress + 4;
-            int offsetBytes = targetAddr - pcPlus4;
-            imm = static_cast<int16_t>(offsetBytes / 4);
+            // int targetAddr = labelMap[lbl];
+            // int pcPlus4 = currentAddress + 4;
+            // int offsetBytes = targetAddr - pcPlus4;
+            // imm = static_cast<int16_t>(offsetBytes / 4);
 
         } else if (j.contains("offset")){
             imm = parseImmediate(j.at("offset"));

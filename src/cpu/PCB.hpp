@@ -54,6 +54,8 @@ struct PCB {
     std::atomic<uint64_t> mem_accesses_total{0};
     std::atomic<uint64_t> extra_cycles{0};
     std::atomic<uint64_t> cache_mem_accesses{0};
+    std::atomic<uint64_t> cache_read_accesses{0};
+    std::atomic<uint64_t> cache_write_accesses{0};
 
     // Instrumentação detalhada
     std::atomic<uint64_t> pipeline_cycles{0};
@@ -62,7 +64,11 @@ struct PCB {
     std::atomic<uint64_t> mem_writes{0};
 
     // Novos contadores
+    std::atomic<uint64_t> cache_write_hits{0};
+    std::atomic<uint64_t> cache_read_hits{0};
     std::atomic<uint64_t> cache_hits{0};
+    std::atomic<uint64_t> cache_write_misses{0};
+    std::atomic<uint64_t> cache_read_misses{0};
     std::atomic<uint64_t> cache_misses{0};
     std::atomic<uint64_t> io_cycles{1};
 
@@ -90,10 +96,24 @@ struct PCB {
 };
 
 // Contabilizar cache
-inline void contabiliza_cache(PCB &pcb, bool hit) {
+inline void contabiliza_cache(PCB &pcb, bool hit, std::string access = "read") {
     if (hit) {
+        if (access == "read") {
+            pcb.cache_read_accesses++;
+            pcb.cache_read_hits++;
+        } else if (access == "write") {
+            pcb.cache_write_accesses++;
+            pcb.cache_write_hits++;
+        }
         pcb.cache_hits++;
     } else {
+        if (access == "read") {
+            pcb.cache_read_accesses++;
+            pcb.cache_read_misses++;
+        } else if (access == "write") {
+            pcb.cache_write_accesses++;
+            pcb.cache_write_misses++;
+        }
         pcb.cache_misses++;
     }
 }

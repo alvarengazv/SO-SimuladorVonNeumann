@@ -47,6 +47,7 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
     if (it != blockTagToLine.end()) {
         // HIT
         cache_hits++;
+        contabiliza_cache(process, true, "read");
         size_t lineIndex = it->second;
 
         updateReplacementPolicy(lineIndex);
@@ -54,6 +55,7 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
     } else {
         // MISS
         cache_misses++;
+        contabiliza_cache(process, false, "read");
 
         // Carrega o bloco da memória principal para a cache
         size_t lineIndex = getLineToEvict();
@@ -76,12 +78,14 @@ void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& proc
     if (it != blockTagToLine.end()) {
         // HIT
         cache_hits++;
+        contabiliza_cache(process, true, "write");
         lineIndex = it->second;
 
         updateReplacementPolicy(lineIndex);
     } else {
         // MISS → write-allocate
         cache_misses++;
+        contabiliza_cache(process, false, "write");
 
         // Carrega o bloco da memória principal para a cache
         lineIndex = getLineToEvict();
