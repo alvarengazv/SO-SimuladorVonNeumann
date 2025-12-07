@@ -7,6 +7,15 @@ void print_metrics(const PCB &pcb) {
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
     std::cout << "Estado Final:           "
               << (pcb.state.load() == State::Finished ? "Finished" : "Incomplete") << "\n";
+    
+    std::cout << "Tempo de Chegada:       " << pcb.arrivalTime << "\n";
+    std::cout << "Tempo de Início:        " << pcb.startTime << "\n";
+    std::cout << "Tempo de Término:       " << pcb.finishTime << "\n";
+    std::cout << "Burst Time (CPU):       " << pcb.burstTime << " ciclos\n";
+    std::cout << "Turnaround Time:        " << pcb.turnaroundTime << "\n";
+    std::cout << "Waiting Time:           " << pcb.waitingTime << "\n";
+    std::cout << "Response Time:          " << pcb.responseTime << "\n";
+  
     std::cout << "Timestamp Final:        " << pcb.timeStamp << "\n";
     std::cout << "Ciclos de Pipeline:     " << pcb.pipeline_cycles.load() << "\n";
     std::cout << "Ciclos de IO:           " << pcb.io_cycles.load() << "\n";
@@ -55,6 +64,16 @@ void print_metrics(const PCB &pcb) {
             resultados << "=== Resultados de Execução ===\n";
         }
         resultados << "\n[Processo PID " << pcb.pid << "] " << pcb.name << "\n";
+        resultados << "Tempo Chegada: " << pcb.arrivalTime
+                << " | Início: " << pcb.startTime
+                << " | Fim: " << pcb.finishTime << "\n";
+
+        resultados << "BurstTime: " << pcb.burstTime << "\n";
+
+        resultados << "Turnaround: " << pcb.turnaroundTime
+                << " | Waiting: " << pcb.waitingTime
+                << " | Response: " << pcb.responseTime << "\n";
+      
         resultados << "Quantum: " << pcb.quantum << " | Timestamp: " << pcb.timeStamp << " | Prioridade: " << pcb.priority << "\n";
         resultados << "Ciclos de Pipeline: " << pcb.pipeline_cycles << "\n";
         resultados << "Ciclos de Memória: " << pcb.memory_cycles << "\n";

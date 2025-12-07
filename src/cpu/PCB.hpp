@@ -75,6 +75,15 @@ struct PCB {
     std::atomic<uint64_t> cache_misses{0};
     std::atomic<uint64_t> io_cycles{1};
 
+    // Novas métricas
+    std::atomic<uint64_t> arrivalTime{0};      // Momento em que chegou ao sistema
+    std::atomic<uint64_t> startTime{0};        // Primeiro ciclo de execução
+    std::atomic<uint64_t> finishTime{0};       // Momento de término
+    std::atomic<uint64_t> burstTime{0};        // Tempo total de CPU usado
+    std::atomic<uint64_t> turnaroundTime{0};   // finishTime - arrivalTime
+    std::atomic<uint64_t> waitingTime{0};      // turnaroundTime - burstTime
+    std::atomic<uint64_t> responseTime{0};     // startTime - arrivalTime
+
     std::unordered_map<uint32_t, PageTableEntry> pageTable;
 
     MemWeights memWeights;

@@ -733,6 +733,9 @@ void Control_Unit::FlushPipeline(ControlContext &context) {
 void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId) {
     Control_Unit UC;
 
+    if (process.startTime.load() == 0) {
+    process.startTime.store(process.timeStamp); // ou use um contador global do simulador
+}
     std::atomic<bool> endProgram{false};
     std::atomic<bool> endExecution{false};
     std::mutex pcMutex;
@@ -1077,6 +1080,9 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
         //           << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
         // std::cout << "========================================\n\n";
     }
+
+   // Depois de todas as threads terem feito join e atualizado timeStamp
+    process.burstTime.fetch_add(issuedCycles.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
     return nullptr;
 }

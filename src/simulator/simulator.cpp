@@ -109,6 +109,8 @@ bool Simulator::loadProcessDefinition(
     process->memWeights.cache = static_cast<uint64_t>(config.cache.weight);
     process->memWeights.primary = static_cast<uint64_t>(config.main_memory.weight);
     process->memWeights.secondary = static_cast<uint64_t>(config.secondary_memory.weight);
+    
+    process->arrivalTime.store(process->timeStamp);
 
     readyQueue.push_back(process.get());
     processList.push_back(std::move(process));
@@ -195,6 +197,42 @@ void Simulator::executeProcesses() {
         print_metrics(*process);
         memManager.freeProcessPages(*process);
     }
+
+    uint64_t totalBurstTime = 0;     // soma do tempo de CPU consumido
+    uint64_t totalTurnaround = 0;    // soma do turnaround
+    uint64_t totalWaiting = 0;       // soma do waiting time
+
+    for (auto process : finishedQueue) {
+        totalBurstTime += process->burstTime.load();
+        totalTurnaround += process->turnaroundTime.load();
+        totalWaiting += process->waitingTime.load();
+    }
+
+    uint64_t totalSimTime = 0;
+    for (auto process : finishedQueue) {
+        if (process->finishTime.load() > totalSimTime)
+            totalSimTime = process->finishTime.load();
+    }
+
+    size_t n = finishedQueue.size();
+    double avgWaitingTime = static_cast<double>(totalWaiting) / n;
+    double avgTurnaroundTime = static_cast<double>(totalTurnaround) / n;
+
+    // Utilização média da CPU
+    double cpuUtilization = static_cast<double>(totalBurstTime) / totalSimTime;
+
+    // Eficiência (CPU útil / tempo total)
+    double efficiency = cpuUtilization; // às vezes são considerados iguais
+
+    // Throughput global (processos concluídos / tempo total)
+    double throughput = static_cast<double>(n) / totalSimTime;
+
+    std::cout << "\n=== MÉTRICAS GLOBAIS DO SIMULADOR ===\n";
+    std::cout << "Tempo médio de espera: " << avgWaitingTime << " ciclos\n";
+    std::cout << "Tempo médio de execução: " << avgTurnaroundTime << " ciclos\n";
+    std::cout << "Utilização média da CPU: " << cpuUtilization * 100 << " %\n";
+    std::cout << "Eficiência: " << efficiency * 100 << " %\n";
+    std::cout << "Throughput global: " << throughput << " processos/ciclo\n";
 }
 
 void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
@@ -211,6 +249,23 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
             break;
         }    
         case State::Finished:{
+            
+            // Calcula métricas finais do processo
+            auto finish = std::chrono::high_resolution_clock::now(); // se quiser tempo real
+
+            // Aqui assumimos que você já tem timeStamp como "ciclo final" do processo
+            process.finishTime.store(process.timeStamp);
+
+            // Turnaround Time = finishTime - arrivalTime
+            process.turnaroundTime.store(process.finishTime.load() - process.arrivalTime.load());
+
+            // Waiting Time = turnaroundTime - burstTime
+            process.waitingTime.store(process.turnaroundTime.load() - process.burstTime.load());
+
+            // Response Time = startTime - arrivalTime
+            process.responseTime.store(process.startTime.load() - process.arrivalTime.load());
+
+
             {
                 std::lock_guard<std::mutex> lock(finishedQueueMutex);
                 finishedQueue.push_back(&process);
