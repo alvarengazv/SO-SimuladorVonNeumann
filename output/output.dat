@@ -2514,3 +2514,517 @@ k1    : 0x00000000  (Decimal: 0)
 (Nenhuma operação registrada)
 
 === Fim das Operações Registradas ===
+
+[Programa: forwarding_test | PID 3]
+Saída declarada (PID 3):
+  -> 12
+  -> 18
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x40000000  (Decimal: 64)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x40000000  (Decimal: 64)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x30000000  (Decimal: 3)
+t1    : 0x40000000  (Decimal: 4)
+t2    : 0x80000000  (Decimal: 8)
+t3    : 0xc0000000  (Decimal: 12)
+t4    : 0x60000000  (Decimal: 6)
+t5    : 0x12000000  (Decimal: 18)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: io_bound_sim | PID 4]
+Saída declarada (PID 4):
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x54000000  (Decimal: 84)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x54000000  (Decimal: 84)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x50000000  (Decimal: 5)
+t1    : 0x50000000  (Decimal: 5)
+t2    : 0xb0000000  (Decimal: 11)
+t3    : 0x00000000  (Decimal: 0)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: processo_teste_1 | PID 1]
+Saída declarada (PID 1):
+  -> 0
+  -> 222
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0xd4000000  (Decimal: 212)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0xd4000000  (Decimal: 212)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0xde000000  (Decimal: 222)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x64000000  (Decimal: 100)
+t1    : 0x50000000  (Decimal: 5)
+t2    : 0x69000000  (Decimal: 105)
+t3    : 0x5f000000  (Decimal: 95)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x19000000  (Decimal: 25)
+t7    : 0x14000000  (Decimal: 20)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0xf0000000  (Decimal: 15)
+s1    : 0x19000000  (Decimal: 25)
+s2    : 0x28000000  (Decimal: 40)
+s3    : 0xf0000000  (Decimal: 15)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: contador_loop | PID 2]
+Saída declarada (PID 2):
+  -> 20
+  -> 19
+  -> 18
+  -> 17
+  -> 16
+  -> 15
+  -> 14
+  -> 13
+  -> 12
+  -> 11
+  -> 10
+  -> 9
+  -> 8
+  -> 7
+  -> 6
+  -> 5
+  -> 4
+  -> 3
+  -> 2
+  -> 1
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x20000000  (Decimal: 32)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x20000000  (Decimal: 32)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x00000000  (Decimal: 0)
+t1    : 0x00000000  (Decimal: 0)
+t2    : 0x00000000  (Decimal: 0)
+t3    : 0x00000000  (Decimal: 0)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: forwarding_test | PID 3]
+Saída declarada (PID 3):
+  -> 12
+  -> 18
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x40000000  (Decimal: 64)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x40000000  (Decimal: 64)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x30000000  (Decimal: 3)
+t1    : 0x40000000  (Decimal: 4)
+t2    : 0x80000000  (Decimal: 8)
+t3    : 0xc0000000  (Decimal: 12)
+t4    : 0x60000000  (Decimal: 6)
+t5    : 0x12000000  (Decimal: 18)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: io_bound_sim | PID 4]
+Saída declarada (PID 4):
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x54000000  (Decimal: 84)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x54000000  (Decimal: 84)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x50000000  (Decimal: 5)
+t1    : 0x50000000  (Decimal: 5)
+t2    : 0xb0000000  (Decimal: 11)
+t3    : 0x00000000  (Decimal: 0)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: processo_teste_1 | PID 1]
+Saída declarada (PID 1):
+  -> 0
+  -> 222
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0xd4000000  (Decimal: 212)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0xd4000000  (Decimal: 212)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0xde000000  (Decimal: 222)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x64000000  (Decimal: 100)
+t1    : 0x50000000  (Decimal: 5)
+t2    : 0x69000000  (Decimal: 105)
+t3    : 0x5f000000  (Decimal: 95)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x19000000  (Decimal: 25)
+t7    : 0x14000000  (Decimal: 20)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0xf0000000  (Decimal: 15)
+s1    : 0x19000000  (Decimal: 25)
+s2    : 0x28000000  (Decimal: 40)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===
+
+[Programa: contador_loop | PID 2]
+Saída declarada (PID 2):
+  -> 20
+  -> 19
+  -> 18
+  -> 17
+  -> 16
+  -> 15
+  -> 14
+  -> 13
+  -> 12
+  -> 11
+  -> 10
+  -> 9
+  -> 8
+  -> 7
+  -> 6
+  -> 5
+  -> 4
+  -> 3
+  -> 2
+  -> 1
+
+Registradores principais:
+========================================
+====== Estado do Banco de Registradores ======
+========================================
+pc    : 0x20000000  (Decimal: 32)
+ir    : 0xfc000000  (Decimal: -67108864)
+mar   : 0x20000000  (Decimal: 32)
+sr    : 0x00000000  (Decimal: 0)
+hi    : 0x00000000  (Decimal: 0)
+lo    : 0x00000000  (Decimal: 0)
+----------------------------------------
+zero  : 0x00000000  (Decimal: 0)
+at    : 0x00000000  (Decimal: 0)
+v0    : 0x00000000  (Decimal: 0)
+v1    : 0x00000000  (Decimal: 0)
+a0    : 0x00000000  (Decimal: 0)
+a1    : 0x00000000  (Decimal: 0)
+a2    : 0x00000000  (Decimal: 0)
+a3    : 0x00000000  (Decimal: 0)
+----------------------------------------
+t0    : 0x00000000  (Decimal: 0)
+t1    : 0x00000000  (Decimal: 0)
+t2    : 0x00000000  (Decimal: 0)
+t3    : 0x00000000  (Decimal: 0)
+t4    : 0x00000000  (Decimal: 0)
+t5    : 0x00000000  (Decimal: 0)
+t6    : 0x00000000  (Decimal: 0)
+t7    : 0x00000000  (Decimal: 0)
+t8    : 0x00000000  (Decimal: 0)
+t9    : 0x00000000  (Decimal: 0)
+----------------------------------------
+s0    : 0x00000000  (Decimal: 0)
+s1    : 0x00000000  (Decimal: 0)
+s2    : 0x00000000  (Decimal: 0)
+s3    : 0x00000000  (Decimal: 0)
+s4    : 0x00000000  (Decimal: 0)
+s5    : 0x00000000  (Decimal: 0)
+s6    : 0x00000000  (Decimal: 0)
+s7    : 0x00000000  (Decimal: 0)
+----------------------------------------
+gp    : 0x00000000  (Decimal: 0)
+sp    : 0x00000000  (Decimal: 0)
+fp    : 0x00000000  (Decimal: 0)
+ra    : 0x00000000  (Decimal: 0)
+k0    : 0x00000000  (Decimal: 0)
+k1    : 0x00000000  (Decimal: 0)
+========================================
+
+
+=== Operações Executadas ===
+(Nenhuma operação registrada)
+
+=== Fim das Operações Registradas ===

@@ -12,6 +12,7 @@ struct MainMemoryConfig {
     int total;
     int page_size;
     int weight;
+    int policy;
 };
 
 struct SecondaryMemoryConfig {

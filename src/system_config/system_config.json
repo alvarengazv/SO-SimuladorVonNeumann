@@ -2,7 +2,8 @@
     "main_memory": {
         "total": 8192,
         "page_size": 256,
-        "weight": 50
+        "weight": 50,
+        "policy": 1
     },
     "secondary_memory": {
         "total": 65536,

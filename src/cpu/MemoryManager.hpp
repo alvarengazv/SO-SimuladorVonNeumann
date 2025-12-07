@@ -14,6 +14,18 @@
 class PCB;
 class Cache;
 
+struct FrameMetadata {
+    int ownerPID = -1;           // Quem usa esse frame
+    uint32_t pageNumber = 0;     // Número da página mapeada
+    bool dirty = false;          // Página foi modificada?
+    bool valid = false;          // Frame está sendo usado?
+};
+
+struct SwappedPage {
+    std::vector<uint32_t> data;  // Conteúdo da página swapada
+    bool valid = false;
+};
+
 class MemoryManager
 {
 public:
@@ -21,7 +33,7 @@ public:
     size_t totalFrames;
     std::vector<bool> framesBitmap;
 
-    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize);
+    MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize, PolicyType framePolicy);
 
     // Métodos unificados agora recebem o PCB para as métricas
     uint32_t read(uint32_t LogicalAddress, PCB &process);
@@ -32,9 +44,12 @@ public:
 
     // Função auxiliar para o write-back da cache
     void writeToPhysical(uint32_t address, uint32_t data, PCB &process);
-
     uint32_t readFromPhysical(uint32_t physicalAddress, PCB &process);
     void freeProcessPages(PCB &process);
+
+    int chooseVictimFrame();
+    int swapOutPage();
+    void swapInPage(uint32_t pageNumber, PCB& process, int freeFrame);
 
 private:
     std::unique_ptr<MAIN_MEMORY> mainMemory;
@@ -46,6 +61,16 @@ private:
 
     uint32_t translateLogicalToPhysical(uint32_t logicalAddress, PCB &process);
     int allocateFreeFrame();
+
+    std::vector<FrameMetadata> frameTable;
+
+    std::unordered_map<uint64_t, SwappedPage> swapSpace;
+
+    std::queue<size_t> frameFIFO;
+    std::list<size_t> frameLRU; 
+    std::unordered_map<size_t, std::list<size_t>::iterator> frameLruPos;
+
+    PolicyType currentFramePolicy;
 };
 
 #endif // MEMORY_MANAGER_HPP

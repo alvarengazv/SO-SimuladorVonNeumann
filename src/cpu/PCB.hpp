@@ -6,6 +6,8 @@
   Centraliza: identificação do processo, prioridade, quantum, pesos de memória e
   contadores de instrumentação de pipeline/memória.
 */
+#include <unordered_map>
+#include <mutex>
 #include <string>
 #include <atomic>
 #include <cstdint>
@@ -81,10 +83,7 @@ struct PCB {
     std::vector<std::string> programOutput;
     mutable std::mutex outputMutex;
 
-    void appendProgramOutput(const std::string &line) {
-        std::lock_guard<std::mutex> lock(outputMutex);
-        programOutput.push_back(line);
-    }
+    void appendProgramOutput(const std::string &line);
 
     std::vector<std::string> snapshotProgramOutput() const {
         std::lock_guard<std::mutex> lock(outputMutex);
@@ -94,6 +93,19 @@ struct PCB {
     int totalTimeExecution() const {
         return (timeStamp + memory_cycles.load() + io_cycles.load());
     }
+
+    // Registra o processo (deve ser chamado quando o PCB é criado/registrado no sistema)
+    static void registerProcess(PCB* proc);
+
+    // Remove o processo do registro (deve ser chamado quando o processo termina)
+    static void unregisterProcess(int pid);
+
+    // Retorna nullptr se não encontrado
+    static PCB* getProcessByPID(int pid);
+
+private:
+    static std::unordered_map<int, PCB*> processTable;
+    static std::mutex processTableMutex;
 };
 
 // Contabilizar cache

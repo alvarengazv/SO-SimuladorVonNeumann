@@ -25,7 +25,7 @@ bool isJsonFile(const std::filesystem::path &path) {
 
 Simulator::Simulator(const std::string &configPath)
     : config(SystemConfig::loadFromFile(configPath)),
-      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size,config.cache.line_size,config.main_memory.page_size),
+      memManager(config.main_memory.total, config.secondary_memory.total, config.cache.size,config.cache.line_size,config.main_memory.page_size,static_cast<PolicyType>(config.main_memory.policy)),
       ioManager() {}
 
 int Simulator::run() {

@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize)
+MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize, PolicyType framePolicy)
 {
     this->pageSize = pageSize;
     this->totalFrames = mainMemorySize / pageSize;
@@ -13,6 +13,12 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
     L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes, PolicyType::FIFO);
 
     mainMemoryLimit = mainMemorySize;
+
+     // Frame Table inicial
+    frameTable.resize(totalFrames);
+
+    // Política de substituição configurada via JSON
+    currentFramePolicy = framePolicy;
 }
 
 uint32_t MemoryManager::read(uint32_t logicalAddress, PCB &process)
@@ -66,6 +72,23 @@ int MemoryManager::allocateFreeFrame()
         if (!framesBitmap[i])
         {
             framesBitmap[i] = true;
+            
+            frameTable[i].valid = true;
+            frameTable[i].dirty = false;
+            frameTable[i].ownerPID = -1;
+            frameTable[i].pageNumber = 0;
+
+            // Inserção na política correta
+            if (currentFramePolicy == PolicyType::FIFO)
+            {
+                frameFIFO.push(i);
+            }
+            else if (currentFramePolicy == PolicyType::LRU)
+            {
+                frameLRU.push_front(i);
+                frameLruPos[i] = frameLRU.begin();
+            }
+
             return static_cast<int>(i);
         }
     }
@@ -89,17 +112,17 @@ uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB 
 
         if (freeFrame == -1)
         {
-            throw std::runtime_error("Out of Memory - Swap not implemented");
-
-            // implementar swap aqui
+            freeFrame = swapOutPage();
         }
 
-        PageTableEntry newEntry;
-        newEntry.frameNumber = static_cast<uint32_t>(freeFrame);
-        newEntry.valid = true;
-        newEntry.dirty = false;
+        swapInPage(pageNumber, process, freeFrame);
 
-        process.pageTable[pageNumber] = newEntry;
+        PageTableEntry entry;
+        entry.frameNumber = freeFrame;
+        entry.valid = true;
+        entry.dirty = false;
+
+        process.pageTable[pageNumber] = entry;
 
         process.secondary_mem_accesses.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
@@ -111,6 +134,19 @@ uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB 
     if (physicalAddress >= mainMemoryLimit)
     {
         throw std::runtime_error("Segmentation Fault: Endereço físico calculado fora dos limites da RAM");
+    }
+
+    // Atualiza LRU se habilitado
+    if (currentFramePolicy == PolicyType::LRU)
+    {
+        size_t frame = physicalFrame;
+
+        auto it = frameLruPos.find(frame);
+        if (it != frameLruPos.end())
+            frameLRU.erase(it->second);
+
+        frameLRU.push_front(frame);
+        frameLruPos[frame] = frameLRU.begin();
     }
 
     return physicalAddress;
@@ -170,20 +206,154 @@ void MemoryManager::freeProcessPages(PCB &process)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
 
-    for (auto &entry : process.pageTable)
+    for (auto &[page, entry] : process.pageTable)
     {
-        if (!entry.second.valid)
+        // Sempre remover do swap, se existir
+        uint64_t swapID = ((uint64_t)process.pid << 32) | page;
+        swapSpace.erase(swapID);
+
+        if (!entry.valid)
         {
             continue;
         }
 
-        uint32_t frameNumber = entry.second.frameNumber;
+        size_t frame = entry.frameNumber;
 
-        if (frameNumber < framesBitmap.size())
+        framesBitmap[frame] = false;
+        frameTable[frame].valid = false;
+        frameTable[frame].ownerPID = -1;
+
+        // Remover da FIFO
+        if (currentFramePolicy == PolicyType::FIFO)
         {
-            framesBitmap[frameNumber] = false;
+            std::queue<size_t> newQueue;
+            while (!frameFIFO.empty())
+            {
+                size_t f = frameFIFO.front();
+                frameFIFO.pop();
+                if (f != frame)
+                    newQueue.push(f);
+            }
+            frameFIFO = std::move(newQueue);
+        }
+        else if (currentFramePolicy == PolicyType::LRU)
+        {
+            auto it = frameLruPos.find(frame);
+            if (it != frameLruPos.end())
+            {
+                frameLRU.erase(it->second);
+                frameLruPos.erase(frame);
+            }
+        }
+    }
+
+    process.pageTable.clear();
+
+}
+
+int MemoryManager::chooseVictimFrame()
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    if (currentFramePolicy == PolicyType::FIFO)
+    {
+        if (frameFIFO.empty()) return -1;
+        size_t v = frameFIFO.front();
+        frameFIFO.pop();
+        return static_cast<int>(v);
+    }
+
+    else if (currentFramePolicy == PolicyType::LRU)
+    {
+        if (frameLRU.empty()) return -1;
+        size_t v = frameLRU.back(); // menos usado
+        frameLRU.pop_back();
+        frameLruPos.erase(v);
+        return static_cast<int>(v);
+    }
+
+    return -1;
+}
+
+int MemoryManager::swapOutPage()
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    int victim = chooseVictimFrame();
+    if (victim < 0 || victim >= totalFrames)
+        throw std::runtime_error("SwapOut: nenhum frame válido encontrado");
+
+    FrameMetadata &meta = frameTable[victim];
+
+    // 1. Escrever no swap se a página estava válida (e sujeita a ser dirty)
+    if (meta.valid)
+    {
+        uint64_t swapKey = (uint64_t(meta.ownerPID) << 32) | meta.pageNumber;
+
+        SwappedPage &swapped = swapSpace[swapKey];
+        swapped.valid = true;
+        swapped.data.resize(pageSize);
+
+        for (size_t i = 0; i < pageSize; i++)
+            swapped.data[i] = mainMemory->ReadMem(victim * pageSize + i);
+    }
+
+    // 2. INVALIDAR entrada da PAGE TABLE do processo
+    PCB *proc = PCB::getProcessByPID(meta.ownerPID);
+    if (proc)
+    {
+        auto it = proc->pageTable.find(meta.pageNumber);
+        if (it != proc->pageTable.end())
+            it->second.valid = false;
+    }
+
+    // 3. Limpar frame
+    meta = FrameMetadata();
+
+    return victim;
+}
+
+void MemoryManager::swapInPage(uint32_t pageNumber, PCB& process, int freeFrame)
+{
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+
+    uint64_t swapID = ((uint64_t)process.pid << 32) | pageNumber;
+
+    size_t wordsPerPage = pageSize / sizeof(uint32_t);
+    uint32_t baseAddress = static_cast<uint32_t>(freeFrame * pageSize);
+
+    if (swapSpace.find(swapID) != swapSpace.end())
+    {
+        auto &sp = swapSpace[swapID];
+
+        for (size_t w = 0; w < wordsPerPage; ++w) {
+            uint32_t wordAddr = baseAddress + static_cast<uint32_t>(w * sizeof(uint32_t));
+            mainMemory->WriteMem(wordAddr, sp.data[w]);
         }
 
-        entry.second.valid = false;
+        swapSpace.erase(swapID);
+    }
+    else
+    {
+        for (size_t w = 0; w < wordsPerPage; ++w) {
+            uint32_t wordAddr = baseAddress + static_cast<uint32_t>(w * sizeof(uint32_t));
+            mainMemory->WriteMem(wordAddr, 0);
+        }
+    }
+
+    FrameMetadata &meta = frameTable[freeFrame];
+    meta.ownerPID = process.pid;
+    meta.pageNumber = pageNumber;
+    meta.valid = true;
+    meta.dirty = false;
+
+    if (currentFramePolicy == PolicyType::FIFO)
+    {
+        frameFIFO.push(static_cast<size_t>(freeFrame));
+    }
+    else if (currentFramePolicy == PolicyType::LRU)
+    {
+        frameLRU.push_front(static_cast<size_t>(freeFrame));
+        frameLruPos[static_cast<size_t>(freeFrame)] = frameLRU.begin();
     }
 }
