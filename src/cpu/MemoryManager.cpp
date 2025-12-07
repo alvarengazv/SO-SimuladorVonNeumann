@@ -45,7 +45,10 @@ void MemoryManager::loadProcessData(uint32_t logicalAddress, uint32_t data, PCB 
 
     mainMemory->WriteMem(physicalAddress, data);
 
+    process.mem_writes.fetch_add(1);
     process.primary_mem_accesses.fetch_add(1);
+    process.mem_accesses_total.fetch_add(1);
+    process.memory_cycles.fetch_add(process.memWeights.primary);
 }
 
 void MemoryManager::write(uint32_t logicalAddress, uint32_t data, PCB &process)
@@ -125,6 +128,8 @@ uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB 
         process.pageTable[pageNumber] = entry;
 
         process.secondary_mem_accesses.fetch_add(1);
+        process.mem_accesses_total.fetch_add(1);
+        process.mem_writes.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
 
@@ -167,6 +172,7 @@ void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB
     {
         mainMemory->WriteMem(physicalAddress, data);
         process.primary_mem_accesses.fetch_add(1);
+        process.mem_accesses_total.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.primary);
     }
     else
@@ -174,6 +180,7 @@ void MemoryManager::writeToPhysical(uint32_t physicalAddress, uint32_t data, PCB
         uint32_t secondaryAddress = physicalAddress - mainMemoryLimit;
         secondaryMemory->WriteMem(secondaryAddress, data);
         process.secondary_mem_accesses.fetch_add(1);
+        process.mem_accesses_total.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
 }
@@ -189,6 +196,8 @@ uint32_t MemoryManager::readFromPhysical(uint32_t physicalAddress, PCB &process)
     {
         data = mainMemory->ReadMem(physicalAddress);
         process.primary_mem_accesses.fetch_add(1);
+        process.mem_reads.fetch_add(1);
+        process.mem_accesses_total.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.primary);
     }
     else
@@ -196,6 +205,8 @@ uint32_t MemoryManager::readFromPhysical(uint32_t physicalAddress, PCB &process)
         uint32_t secondaryAddress = physicalAddress - mainMemoryLimit;
         data = secondaryMemory->ReadMem(secondaryAddress);
         process.secondary_mem_accesses.fetch_add(1);
+        process.mem_reads.fetch_add(1);
+        process.mem_accesses_total.fetch_add(1);
         process.memory_cycles.fetch_add(process.memWeights.secondary);
     }
 
