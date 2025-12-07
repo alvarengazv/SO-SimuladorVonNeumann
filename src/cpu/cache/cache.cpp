@@ -198,20 +198,24 @@ size_t Cache::getLineToEvict() {
 
     if (currentPolicy == PolicyType::FIFO) {
         // A CachePolicy remove da fila e retorna o índice
-        victimIndex = policyHandler.getAddressToReplace(fifoQueue);
+        // victimIndex = policyHandler.getAddressToReplace(fifoQueue);
         
         // Verificação de segurança (caso a fila estivesse vazia, retornaria max)
-        if (victimIndex == std::numeric_limits<size_t>::max()) {
+        if (fifoQueue.empty()) {
             throw std::runtime_error("Erro: Tentativa de evict em fila FIFO vazia.");
         }
+        victimIndex = fifoQueue.front();
+        fifoQueue.pop();
 
     } else { // LRU
         // A CachePolicy remove do final da lista (back) e retorna o índice
-        victimIndex = policyHandler.getAddressToReplace(lruOrder);
+        // victimIndex = policyHandler.getAddressToReplace(lruOrder);
 
-        if (victimIndex == std::numeric_limits<size_t>::max()) {
+        if (lruOrder.empty()) {
              throw std::runtime_error("Erro: Tentativa de evict em lista LRU vazia.");
         }
+        victimIndex = lruOrder.back();
+        lruOrder.pop_back();
         
         // Removemos do mapa auxiliar de iteradores, pois ele saiu da lista
         lruPos.erase(victimIndex);
@@ -251,4 +255,50 @@ void Cache::setReplacementPolicy(PolicyType policy) {
 
 PolicyType Cache::getReplacementPolicy() const {
     return currentPolicy;
+}
+
+size_t Cache::getUsage() const {
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
+    size_t used = 0;
+    for (const auto& line : lines) {
+        if (line.valid) {
+            used++;
+        }
+    }
+    return used;
+}
+
+size_t Cache::getCapacity() const {
+    return capacity;
+}
+
+void Cache::invalidatePage(uint32_t physicalAddressStart, size_t size, int pid, MemoryManager* mem, PCB* process) {
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
+    
+    size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
+    
+    // Iterate through all blocks that could be in this page
+    for (uint32_t addr = physicalAddressStart; addr < physicalAddressStart + size; addr += blockSizeBytes) {
+        AddressDecoded info = decodeAddress(addr, pid);
+        
+        auto it = blockTagToLine.find(info.tag);
+        if (it != blockTagToLine.end()) {
+            size_t lineIndex = it->second;
+            
+            // Write back if dirty
+            if (lines[lineIndex].dirty && lines[lineIndex].valid && process != nullptr) {
+                evictLine(lineIndex, mem, *process);
+                // evictLine invalidates the line and removes from map.
+                continue;
+            }
+
+            // Invalidate line (evictLine might have already done this, but let's be sure)
+            lines[lineIndex].valid = false;
+            lines[lineIndex].dirty = false;
+            lines[lineIndex].tag = 0;
+            
+            // Remove from map
+            blockTagToLine.erase(it);
+        }
+    }
 }

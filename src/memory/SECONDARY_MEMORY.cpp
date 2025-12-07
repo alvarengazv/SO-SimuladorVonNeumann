@@ -1,11 +1,7 @@
 #include "SECONDARY_MEMORY.hpp"
 
 SECONDARY_MEMORY::SECONDARY_MEMORY(size_t size) {
-    if (size > MAX_SECONDARY_MEMORY_SIZE) {
-        this->size = MAX_SECONDARY_MEMORY_SIZE;
-    } else {
-        this->size = size;
-    }
+    this->size = size;
     this->storage.resize(this->size, MEMORY_ACCESS_ERROR);
 }
 

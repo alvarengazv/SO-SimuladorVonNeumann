@@ -21,16 +21,12 @@ struct FrameMetadata {
     bool valid = false;          // Frame está sendo usado?
 };
 
-struct SwappedPage {
-    std::vector<uint32_t> data;  // Conteúdo da página swapada
-    bool valid = false;
-};
-
 class MemoryManager
 {
 public:
     size_t pageSize;
     size_t totalFrames;
+    size_t totalSwapFrames;
     std::vector<bool> framesBitmap;
 
     MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, size_t cacheNumLines, size_t cacheLineSizeBytes, size_t pageSize, PolicyType framePolicy);
@@ -51,6 +47,14 @@ public:
     int swapOutPage();
     void swapInPage(uint32_t pageNumber, PCB& process, int freeFrame);
 
+    // Métricas de uso
+    size_t getMainMemoryUsage() const;
+    size_t getSecondaryMemoryUsage() const;
+    size_t getCacheUsage() const;
+
+    size_t getCacheCapacity() const;
+    size_t getSecondaryMemoryCapacity() const;
+
 private:
     std::unique_ptr<MAIN_MEMORY> mainMemory;
     std::unique_ptr<SECONDARY_MEMORY> secondaryMemory;
@@ -64,7 +68,9 @@ private:
 
     std::vector<FrameMetadata> frameTable;
 
-    std::unordered_map<uint64_t, SwappedPage> swapSpace;
+    // std::unordered_map<uint64_t, SwappedPage> swapSpace;
+    std::queue<uint32_t> freeSwapFrames;
+    std::unordered_map<uint64_t, uint32_t> swapMap; // (pid << 32 | page) -> swapFrameIndex
 
     std::queue<size_t> frameFIFO;
     std::list<size_t> frameLRU; 

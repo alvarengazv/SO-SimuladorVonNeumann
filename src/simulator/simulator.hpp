@@ -48,6 +48,16 @@ private:
                               int &finishedProcesses);
     bool allCoresIdle(const std::vector<PCB *> &coreAssignments) const;
 
+    struct MemoryUsageRecord {
+        long long timestamp;
+        double cacheUsage;
+        double ramUsage;
+        double diskUsage;
+    };
+    std::vector<MemoryUsageRecord> memoryUsageHistory;
+    void collectMemoryMetrics();
+    void saveMemoryMetrics(const std::string& filename);
+
     SystemConfig config;
     MemoryManager memManager;
 

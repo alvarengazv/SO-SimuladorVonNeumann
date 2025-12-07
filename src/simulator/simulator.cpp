@@ -101,6 +101,7 @@ bool Simulator::loadProcessDefinition(
                                        int pid) {
     auto process = std::make_unique<PCB>();
     process->pid = pid;
+    PCB::registerProcess(process.get());
     
     std::cout << "Carregando programa '" << taskLabel << "' para o processo " << process->pid << "...\n";
     int startCodeAddr = loadJsonProgram(taskFile, memManager, *process, baseAddress);
@@ -147,6 +148,7 @@ void Simulator::executeProcesses() {
     }
 
     while (finishedProcesses < totalProcesses) {
+        collectMemoryMetrics(); // Coleta métricas a cada iteração do loop principal
         moveUnblockedProcesses();
         reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
 
@@ -188,6 +190,8 @@ void Simulator::executeProcesses() {
     }
 
     reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
+    
+    saveMemoryMetrics("output/memory_usage.csv");
 
     for (auto &core : cpuCores) {
         core->stop();
@@ -316,4 +320,49 @@ bool Simulator::allCoresIdle(const std::vector<PCB *> &coreAssignments) const {
     return std::all_of(coreAssignments.begin(), coreAssignments.end(), [](PCB *pcb) {
         return pcb == nullptr;
     });
+}
+
+void Simulator::collectMemoryMetrics() {
+    using namespace std::chrono;
+    auto now = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+    
+    MemoryUsageRecord record;
+    record.timestamp = now;
+
+    size_t cacheUsed = memManager.getCacheUsage();
+    size_t cacheTotal = memManager.getCacheCapacity();
+    record.cacheUsage = (cacheTotal > 0) ? (static_cast<double>(cacheUsed) / cacheTotal * 100.0) : 0.0;
+
+    size_t ramUsed = memManager.getMainMemoryUsage();
+    size_t ramTotal = memManager.totalFrames;
+    record.ramUsage = (ramTotal > 0) ? (static_cast<double>(ramUsed) / ramTotal * 100.0) : 0.0;
+
+    size_t diskUsed = memManager.getSecondaryMemoryUsage();
+    size_t diskTotal = memManager.getSecondaryMemoryCapacity();
+    record.diskUsage = (diskTotal > 0) ? (static_cast<double>(diskUsed) / diskTotal * 100.0) : 0.0;
+    
+    memoryUsageHistory.push_back(record);
+}
+
+void Simulator::saveMemoryMetrics(const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Erro ao abrir arquivo para salvar métricas de memória: " << filename << "\n";
+        return;
+    }
+
+    file << "Timestamp,CacheUsage(%),RAMUsage(%),DiskUsage(%)\n";
+    
+    if (memoryUsageHistory.empty()) return;
+
+    long long startTime = memoryUsageHistory.front().timestamp;
+
+    for (const auto& record : memoryUsageHistory) {
+        file << (record.timestamp - startTime) << ","
+             << record.cacheUsage << ","
+             << record.ramUsage << ","
+             << record.diskUsage << "\n";
+    }
+    
+    std::cout << "Métricas de memória salvas em: " << filename << "\n";
 }

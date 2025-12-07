@@ -84,6 +84,11 @@ class Cache {
 
     // Utilidades
     void invalidate();
+    void invalidatePage(uint32_t physicalAddressStart, size_t size, int pid, MemoryManager* mem, PCB* process);
+
+    // Métricas de uso
+    size_t getUsage() const;
+    size_t getCapacity() const;
 };
 
 #endif

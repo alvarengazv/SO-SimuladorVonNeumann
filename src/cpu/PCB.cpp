@@ -3,6 +3,10 @@
 std::unordered_map<int, PCB*> PCB::processTable;
 std::mutex PCB::processTableMutex;
 
+PCB::~PCB() {
+    unregisterProcess(this->pid);
+}
+
 void PCB::registerProcess(PCB* proc) {
     if (!proc) return;
     std::lock_guard<std::mutex> lock(processTableMutex);

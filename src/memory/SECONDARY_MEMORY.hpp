@@ -6,7 +6,6 @@
 #include <cstddef>
 
 #define MEMORY_ACCESS_ERROR UINT32_MAX
-#define MAX_SECONDARY_MEMORY_SIZE 8192
 
 using std::size_t;
 using std::uint32_t;

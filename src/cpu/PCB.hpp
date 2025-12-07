@@ -48,6 +48,9 @@ struct PCB {
     int instructions;
 
     std::atomic<State> state{State::Ready};
+    
+    ~PCB();
+
     hw::REGISTER_BANK regBank;
 
     // Contadores de acesso à memória

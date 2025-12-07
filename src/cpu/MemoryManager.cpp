@@ -10,7 +10,8 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
     // Cria cache com política FIFO padrão
-    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes, PolicyType::FIFO);
+    // cacheLineSizeBytes is in bytes, but Cache expects wordsPerLine
+    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes / sizeof(uint32_t), PolicyType::FIFO);
 
     mainMemoryLimit = mainMemorySize;
 
@@ -19,6 +20,12 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
 
     // Política de substituição configurada via JSON
     currentFramePolicy = framePolicy;
+
+    // Inicializa frames livres na memória secundária
+    this->totalSwapFrames = secondaryMemorySize / pageSize;
+    for (uint32_t i = 0; i < totalSwapFrames; ++i) {
+        freeSwapFrames.push(i);
+    }
 }
 
 uint32_t MemoryManager::read(uint32_t logicalAddress, PCB &process)
@@ -42,6 +49,9 @@ void MemoryManager::loadProcessData(uint32_t logicalAddress, uint32_t data, PCB 
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
 
     uint32_t physicalAddress = translateLogicalToPhysical(logicalAddress, process);
+
+    // std::cout << "[DEBUG] LoadProcessData: PID " << process.pid << " LogAddr " << logicalAddress 
+    //           << " PhysAddr " << physicalAddress << " Data " << data << std::endl;
 
     mainMemory->WriteMem(physicalAddress, data);
 
@@ -221,7 +231,12 @@ void MemoryManager::freeProcessPages(PCB &process)
     {
         // Sempre remover do swap, se existir
         uint64_t swapID = ((uint64_t)process.pid << 32) | page;
-        swapSpace.erase(swapID);
+        if (swapMap.count(swapID)) {
+            freeSwapFrames.push(swapMap[swapID]);
+            swapMap.erase(swapID);
+            // std::cout << "[DEBUG] Swap Free (ProcessEnd): PID " << process.pid << " Page " << page 
+            //           << " -> SwapFrame " << swapMap[swapID] << ". Remaining: " << freeSwapFrames.size() << std::endl;
+        }
 
         if (!entry.valid)
         {
@@ -299,14 +314,23 @@ int MemoryManager::swapOutPage()
     // 1. Escrever no swap se a página estava válida (e sujeita a ser dirty)
     if (meta.valid)
     {
+        if (freeSwapFrames.empty()) {
+            throw std::runtime_error("SwapOut: Memória secundária cheia!");
+        }
+
+        uint32_t swapFrame = freeSwapFrames.front();
+        freeSwapFrames.pop();
+
         uint64_t swapKey = (uint64_t(meta.ownerPID) << 32) | meta.pageNumber;
-
-        SwappedPage &swapped = swapSpace[swapKey];
-        swapped.valid = true;
-        swapped.data.resize(pageSize);
-
-        for (size_t i = 0; i < pageSize; i++)
-            swapped.data[i] = mainMemory->ReadMem(victim * pageSize + i);
+        swapMap[swapKey] = swapFrame;
+        
+        uint32_t baseSwapAddr = swapFrame * pageSize;
+        // Copia byte a byte (ou word a word, dependendo da interpretação de pageSize)
+        // Mantendo consistência com a implementação anterior que usava loop até pageSize
+        for (size_t i = 0; i < pageSize; i++) {
+            uint32_t val = mainMemory->ReadMem(victim * pageSize + i);
+            secondaryMemory->WriteMem(baseSwapAddr + i, val);
+        }
     }
 
     // 2. INVALIDAR entrada da PAGE TABLE do processo
@@ -317,6 +341,9 @@ int MemoryManager::swapOutPage()
         if (it != proc->pageTable.end())
             it->second.valid = false;
     }
+
+    // Invalidate Cache for this frame
+    L1_cache->invalidatePage(victim * pageSize, pageSize, meta.ownerPID, this, proc);
 
     // 3. Limpar frame
     meta = FrameMetadata();
@@ -330,25 +357,29 @@ void MemoryManager::swapInPage(uint32_t pageNumber, PCB& process, int freeFrame)
 
     uint64_t swapID = ((uint64_t)process.pid << 32) | pageNumber;
 
-    size_t wordsPerPage = pageSize / sizeof(uint32_t);
+    // size_t wordsPerPage = pageSize / sizeof(uint32_t);
     uint32_t baseAddress = static_cast<uint32_t>(freeFrame * pageSize);
 
-    if (swapSpace.find(swapID) != swapSpace.end())
+    if (swapMap.count(swapID))
     {
-        auto &sp = swapSpace[swapID];
+        uint32_t swapFrame = swapMap[swapID];
+        uint32_t baseSwapAddr = swapFrame * pageSize;
 
-        for (size_t w = 0; w < wordsPerPage; ++w) {
-            uint32_t wordAddr = baseAddress + static_cast<uint32_t>(w * sizeof(uint32_t));
-            mainMemory->WriteMem(wordAddr, sp.data[w]);
+        // Restaura usando a mesma lógica de loop do swapOut (copia tudo)
+        for (size_t i = 0; i < pageSize; ++i) {
+            uint32_t val = secondaryMemory->ReadMem(baseSwapAddr + i);
+            mainMemory->WriteMem(baseAddress + i, val);
         }
 
-        swapSpace.erase(swapID);
+        // Libera o frame de swap
+        freeSwapFrames.push(swapFrame);
+        swapMap.erase(swapID);
     }
     else
     {
-        for (size_t w = 0; w < wordsPerPage; ++w) {
-            uint32_t wordAddr = baseAddress + static_cast<uint32_t>(w * sizeof(uint32_t));
-            mainMemory->WriteMem(wordAddr, 0);
+        // Página nova (fill com END_SENTINEL para parar o FetchInstruction)
+        for (size_t i = 0; i < pageSize; ++i) {
+            mainMemory->WriteMem(baseAddress + i, 0xFC000000);
         }
     }
 
@@ -367,4 +398,32 @@ void MemoryManager::swapInPage(uint32_t pageNumber, PCB& process, int freeFrame)
         frameLRU.push_front(static_cast<size_t>(freeFrame));
         frameLruPos[static_cast<size_t>(freeFrame)] = frameLRU.begin();
     }
+}
+
+size_t MemoryManager::getMainMemoryUsage() const {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    size_t used = 0;
+    for (const auto& meta : frameTable) {
+        if (meta.valid) used++;
+    }
+    return used;
+}
+
+size_t MemoryManager::getSecondaryMemoryUsage() const {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    return swapMap.size();
+}
+
+size_t MemoryManager::getCacheUsage() const {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    return L1_cache->getUsage();
+}
+
+size_t MemoryManager::getCacheCapacity() const {
+    std::lock_guard<std::recursive_mutex> lock(memoryMutex);
+    return L1_cache->getCapacity();
+}
+
+size_t MemoryManager::getSecondaryMemoryCapacity() const {
+    return totalSwapFrames;
 }
