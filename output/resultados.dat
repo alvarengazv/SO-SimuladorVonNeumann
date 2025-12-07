@@ -237,3 +237,294 @@ Ciclos de IO: 1
 Saída do Programa:
   (Sem saída registrada)
 ------------------------------------------
+
+[Processo PID 3] forwarding_test
+Quantum: 26 | Timestamp: 10 | Prioridade: 0
+Ciclos de Pipeline: 10
+Ciclos de Memória: 3225
+Acessos a Cache L1:     15
+  - Reads:     13
+     - Hits:    12
+     - Misses:    1
+  - Writes:    2
+     - Hits:    2
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3236
+Cores Utilizados: 2 
+Saída do Programa (PID 3):
+  -> 12
+  -> 18
+------------------------------------------
+
+[Processo PID 4] io_bound_sim
+Quantum: 30 | Timestamp: 41 | Prioridade: 0
+Ciclos de Pipeline: 41
+Ciclos de Memória: 3268
+Acessos a Cache L1:     58
+  - Reads:     53
+     - Hits:    52
+     - Misses:    1
+  - Writes:    5
+     - Hits:    5
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3310
+Cores Utilizados: 3 2 1 0 3 0 
+Saída do Programa (PID 4):
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 14 | Timestamp: 106 | Prioridade: 0
+Ciclos de Pipeline: 106
+Ciclos de Memória: 3344
+Acessos a Cache L1:     134
+  - Reads:     122
+     - Hits:    121
+     - Misses:    1
+  - Writes:    12
+     - Hits:    12
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3451
+Cores Utilizados: 0 0 3 1 0 2 0 1 
+Saída do Programa (PID 1):
+  -> 0
+  -> 222
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 7 | Timestamp: 105 | Prioridade: 0
+Ciclos de Pipeline: 105
+Ciclos de Memória: 3357
+Acessos a Cache L1:     147
+  - Reads:     127
+     - Hits:    126
+     - Misses:    1
+  - Writes:    20
+     - Hits:    20
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3463
+Cores Utilizados: 1 1 0 2 1 3 2 0 3 1 2 0 3 1 2 0 3 1 2 0 3 1 
+Saída do Programa (PID 2):
+  -> 20
+  -> 19
+  -> 18
+  -> 17
+  -> 16
+  -> 15
+  -> 14
+  -> 13
+  -> 12
+  -> 11
+  -> 10
+  -> 9
+  -> 8
+  -> 7
+  -> 6
+  -> 5
+  -> 4
+  -> 3
+  -> 2
+  -> 1
+------------------------------------------
+
+[Processo PID 3] forwarding_test
+Quantum: 26 | Timestamp: 10 | Prioridade: 0
+Ciclos de Pipeline: 10
+Ciclos de Memória: 3225
+Acessos a Cache L1:     15
+  - Reads:     13
+     - Hits:    12
+     - Misses:    1
+  - Writes:    2
+     - Hits:    2
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3236
+Cores Utilizados: 2 
+Saída do Programa (PID 3):
+  -> 12
+  -> 18
+------------------------------------------
+
+[Processo PID 4] io_bound_sim
+Quantum: 30 | Timestamp: 41 | Prioridade: 0
+Ciclos de Pipeline: 41
+Ciclos de Memória: 3268
+Acessos a Cache L1:     58
+  - Reads:     53
+     - Hits:    52
+     - Misses:    1
+  - Writes:    5
+     - Hits:    5
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3310
+Cores Utilizados: 3 3 2 1 0 3 
+Saída do Programa (PID 4):
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 14 | Timestamp: 105 | Prioridade: 0
+Ciclos de Pipeline: 105
+Ciclos de Memória: 3343
+Acessos a Cache L1:     133
+  - Reads:     121
+     - Hits:    120
+     - Misses:    1
+  - Writes:    12
+     - Hits:    12
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3449
+Cores Utilizados: 0 0 0 3 1 0 2 3 
+Saída do Programa (PID 1):
+  -> 0
+  -> 222
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 7 | Timestamp: 105 | Prioridade: 0
+Ciclos de Pipeline: 105
+Ciclos de Memória: 3357
+Acessos a Cache L1:     147
+  - Reads:     127
+     - Hits:    126
+     - Misses:    1
+  - Writes:    20
+     - Hits:    20
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3463
+Cores Utilizados: 1 1 1 0 2 1 0 1 0 2 1 3 0 2 1 3 0 2 1 3 0 
+Saída do Programa (PID 2):
+  -> 20
+  -> 19
+  -> 18
+  -> 17
+  -> 16
+  -> 15
+  -> 14
+  -> 13
+  -> 12
+  -> 11
+  -> 10
+  -> 9
+  -> 8
+  -> 7
+  -> 6
+  -> 5
+  -> 4
+  -> 3
+  -> 2
+  -> 1
+------------------------------------------
+
+[Processo PID 3] forwarding_test
+Quantum: 26 | Timestamp: 10 | Prioridade: 0
+Ciclos de Pipeline: 10
+Ciclos de Memória: 3225
+Acessos a Cache L1:     15
+  - Reads:     13
+     - Hits:    12
+     - Misses:    1
+  - Writes:    2
+     - Hits:    2
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3236
+Cores Utilizados: 2 
+Saída do Programa (PID 3):
+  -> 12
+  -> 18
+------------------------------------------
+
+[Processo PID 1] processo_teste_1
+Quantum: 14 | Timestamp: 106 | Prioridade: 0
+Ciclos de Pipeline: 106
+Ciclos de Memória: 3344
+Acessos a Cache L1:     134
+  - Reads:     122
+     - Hits:    121
+     - Misses:    1
+  - Writes:    12
+     - Hits:    12
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3451
+Cores Utilizados: 0 0 0 3 1 0 2 0 
+Saída do Programa (PID 1):
+  -> 0
+  -> 222
+------------------------------------------
+
+[Processo PID 4] io_bound_sim
+Quantum: 30 | Timestamp: 41 | Prioridade: 0
+Ciclos de Pipeline: 41
+Ciclos de Memória: 3268
+Acessos a Cache L1:     58
+  - Reads:     53
+     - Hits:    52
+     - Misses:    1
+  - Writes:    5
+     - Hits:    5
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3310
+Cores Utilizados: 3 2 1 0 3 2 
+Saída do Programa (PID 4):
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+  -> 11
+------------------------------------------
+
+[Processo PID 2] contador_loop
+Quantum: 7 | Timestamp: 105 | Prioridade: 0
+Ciclos de Pipeline: 105
+Ciclos de Memória: 3357
+Acessos a Cache L1:     147
+  - Reads:     127
+     - Hits:    126
+     - Misses:    1
+  - Writes:    20
+     - Hits:    20
+     - Misses:    0
+Ciclos de IO: 1
+Tempo Total de Execução: 3463
+Cores Utilizados: 1 1 1 0 2 1 0 1 3 0 1 2 3 0 1 2 3 0 1 2 3 
+Saída do Programa (PID 2):
+  -> 20
+  -> 19
+  -> 18
+  -> 17
+  -> 16
+  -> 15
+  -> 14
+  -> 13
+  -> 12
+  -> 11
+  -> 10
+  -> 9
+  -> 8
+  -> 7
+  -> 6
+  -> 5
+  -> 4
+  -> 3
+  -> 2
+  -> 1
+------------------------------------------

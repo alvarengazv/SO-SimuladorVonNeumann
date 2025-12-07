@@ -10,7 +10,7 @@ MemoryManager::MemoryManager(size_t mainMemorySize, size_t secondaryMemorySize, 
     mainMemory = std::make_unique<MAIN_MEMORY>(mainMemorySize);
     secondaryMemory = std::make_unique<SECONDARY_MEMORY>(secondaryMemorySize);
     // Cria cache com política FIFO padrão
-    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes, ReplacementPolicy::FIFO);
+    L1_cache = std::make_unique<Cache>(cacheNumLines, cacheLineSizeBytes, PolicyType::FIFO);
 
     mainMemoryLimit = mainMemorySize;
 }
@@ -116,7 +116,7 @@ uint32_t MemoryManager::translateLogicalToPhysical(uint32_t logicalAddress, PCB 
     return physicalAddress;
 }
 
-void MemoryManager::setCacheReplacementPolicy(ReplacementPolicy policy)
+void MemoryManager::setCacheReplacementPolicy(PolicyType policy)
 {
     std::lock_guard<std::recursive_mutex> lock(memoryMutex);
     L1_cache->setReplacementPolicy(policy);

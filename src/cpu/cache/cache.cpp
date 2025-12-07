@@ -1,6 +1,6 @@
 #include "cache.hpp"
 
-Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
+Cache::Cache(size_t numLines, size_t wordsPerLine, PolicyType policy)
         : capacity(numLines),
         wordsPerLine(wordsPerLine),
         cache_hits(0),
@@ -124,7 +124,7 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
     // Atualiza política de substituição
     updateReplacementPolicy(lineIndex);
 
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         fifoQueue.push(lineIndex);
     }
 }
@@ -196,7 +196,7 @@ size_t Cache::getLineToEvict() {
 
     size_t victimIndex;
 
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         // A CachePolicy remove da fila e retorna o índice
         victimIndex = policyHandler.getAddressToReplace(fifoQueue);
         
@@ -222,9 +222,9 @@ size_t Cache::getLineToEvict() {
 
 // Atualiza estruturas da política de substituição após acesso
 void Cache::updateReplacementPolicy(size_t lineIndex) {
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         return;  // FIFO não requer atualização no acesso
-    } else if (currentPolicy == ReplacementPolicy::LRU) {
+    } else if (currentPolicy == PolicyType::LRU) {
         // Se a linha já está na lista, removemos sua posição antiga
         auto it = lruPos.find(lineIndex);
         if (it != lruPos.end()) {
@@ -238,7 +238,7 @@ void Cache::updateReplacementPolicy(size_t lineIndex) {
 }
 
 // Set e get para a política de substituição
-void Cache::setReplacementPolicy(ReplacementPolicy policy) {
+void Cache::setReplacementPolicy(PolicyType policy) {
     if (currentPolicy == policy) {
         return;
     }
@@ -249,6 +249,6 @@ void Cache::setReplacementPolicy(ReplacementPolicy policy) {
     invalidate();
 }
 
-ReplacementPolicy Cache::getReplacementPolicy() const {
+PolicyType Cache::getReplacementPolicy() const {
     return currentPolicy;
 }

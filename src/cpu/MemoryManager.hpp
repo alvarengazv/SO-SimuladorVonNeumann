@@ -6,7 +6,7 @@
 #include <mutex>
 #include "../memory/MAIN_MEMORY.hpp"
 #include "../memory/SECONDARY_MEMORY.hpp"
-#include "../memory/replacement_police.hpp"
+#include "../memory/replacementPolicy.hpp"
 #include "cache/cache.hpp"
 #include "PCB.hpp"
 
@@ -28,7 +28,7 @@ public:
     void write(uint32_t LogicalAddress, uint32_t data, PCB &process);
     void loadProcessData(uint32_t logicalAddress, uint32_t data, PCB &process);
 
-    void setCacheReplacementPolicy(ReplacementPolicy policy);
+    void setCacheReplacementPolicy(PolicyType policy);
 
     // Função auxiliar para o write-back da cache
     void writeToPhysical(uint32_t address, uint32_t data, PCB &process);

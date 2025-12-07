@@ -11,8 +11,7 @@
 #include <vector>
 
 #include "../MemoryManager.hpp"
-#include "../../memory/replacement_police.hpp"
-#include "cachePolicy.hpp"
+#include "../../memory/replacementPolicy.hpp"
 #include "../PCB.hpp"
 
 // Forward declarations para evitar ciclo de includes
@@ -53,8 +52,8 @@ class Cache {
     std::list<size_t> lruOrder;    // Para LRU
     std::unordered_map<size_t, std::list<size_t>::iterator> lruPos;
 
-    ReplacementPolicy currentPolicy;
-    CachePolicy policyHandler;
+    PolicyType currentPolicy;
+    ReplacementPolicy policyHandler;
 
     AddressDecoded decodeAddress(uint32_t address, int pid) const;
 
@@ -69,7 +68,7 @@ class Cache {
     void evictLine(size_t lineIndex, MemoryManager* mem, PCB& process);
 
    public:
-    Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy);
+    Cache(size_t numLines, size_t wordsPerLine, PolicyType policy);
     ~Cache();
 
     // Operações principais
@@ -80,8 +79,8 @@ class Cache {
     int get_misses();
 
     // Configuração
-    void setReplacementPolicy(ReplacementPolicy policy);
-    ReplacementPolicy getReplacementPolicy() const;
+    void setReplacementPolicy(PolicyType policy);
+    PolicyType getReplacementPolicy() const;
 
     // Utilidades
     void invalidate();
