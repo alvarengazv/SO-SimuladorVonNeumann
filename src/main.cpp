@@ -13,8 +13,6 @@ int main() {
     std::cout << "I------------------------------------------------I\n";
     std::cout << "I--- Simulador de Arquitetura de Von Neumann  ---I\n";
     std::cout << "I------------------------------------------------I\n";
-    std::cout << "Pressione Enter para iniciar...\n";
-    std::cin.get();
     
     try {
         Simulator simulator;

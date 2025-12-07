@@ -1,0 +1,3 @@
+Baseline: 12868.0
+Otimizado: 3217.0
+Speedup: 4.00x
