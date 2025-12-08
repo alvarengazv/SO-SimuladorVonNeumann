@@ -301,19 +301,6 @@ O `Makefile` já encapsula o fluxo do CMake.
    ```
 
 
-
-
-### Testes
-Rodar alvos de teste (na pasta `build/`):
-
-```bash
-make test-all   # todos os testes
-make test_ula   # ULA
-make test_hash  # mapeador de registradores
-make test_bank  # banco de registradores
-make test_metrics  # métricas da CPU
-```
-
 ### Dicas e troubleshooting rápido
 - **Arquivo de config não encontrado:** garanta o caminho correto (`src/system_config/system_config.json`) ou passe o caminho na linha de comando.
 - **Build quebrando por CMake:** rode `make clean` e verifique se o CMake (3.10+) está instalado.
