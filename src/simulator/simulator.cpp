@@ -222,11 +222,19 @@ void Simulator::executeProcesses() {
     double avgWaitingTime = static_cast<double>(totalWaiting) / n;
     double avgTurnaroundTime = static_cast<double>(totalTurnaround) / n;
 
-    // Utilização média da CPU
-    double cpuUtilization = static_cast<double>(totalBurstTime) / totalSimTime;
+    // Utilização média da CPU (fração do tempo útil sobre a capacidade total)
+    // totalBurstTime é a soma do tempo de CPU consumido por todos os processos.
+    // Em sistemas com múltiplos núcleos a capacidade total disponível é
+    // numCores * totalSimTime. Sem dividir por numCores a métrica pode
+    // exceder 1.0 (100%).
+    double cpuUtilization = 0.0;
+    if (totalSimTime > 0) {
+        cpuUtilization = static_cast<double>(totalBurstTime) / (static_cast<double>(numCores) * static_cast<double>(totalSimTime));
+    }
 
-    // Eficiência (CPU útil / tempo total)
-    double efficiency = cpuUtilization; // às vezes são considerados iguais
+    // Eficiência (CPU útil / tempo total disponível). Mantemos igual à
+    // utilização aqui, mas sem a normalização por núcleos o valor seria >100%.
+    double efficiency = cpuUtilization;
 
     // Throughput global (processos concluídos / tempo total)
     double throughput = static_cast<double>(n) / totalSimTime;
