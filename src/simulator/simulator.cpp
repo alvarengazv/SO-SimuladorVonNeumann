@@ -33,7 +33,7 @@ int Simulator::run() {
     if (!loadProcesses()) {
         return 1;
     }
-    memManager.setCacheReplacementPolicy(static_cast<ReplacementPolicy>(config.cache.policy)); //onde vai chamar pra trocar a politica de substituição da cache
+    memManager.setCacheReplacementPolicy(static_cast<PolicyType>(config.cache.policy)); //onde vai chamar pra trocar a politica de substituição da cache
     scheduler = std::make_unique<ProcessScheduler>(config.scheduling.algorithm, readyQueue);
 
     std::cout << "\nIniciando escalonador " << schedulerName(config.scheduling.algorithm) << "...\n";
@@ -176,13 +176,13 @@ void Simulator::executeProcesses() {
         coreAssignments[coreIdx] = currentProcess;
         cpuCores[coreIdx]->submitProcess(currentProcess, false);
         currentProcess->coresAssigned.push_back(coreIdx);
-        {
-            std::lock_guard<std::mutex> lock(printMutex);
-            // std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
-            //         << " (Quantum: " << currentProcess->quantum
-            //         << ") (Prioridade: " << currentProcess->priority << ")"
-            //         << ") (Intruções: " << currentProcess->instructions << ").\n";
-        }
+        // {
+        //     std::lock_guard<std::mutex> lock(printMutex);
+        //     // std::cout << "\n[Scheduler] Executando processo " << currentProcess->pid
+        //     //         << " (Quantum: " << currentProcess->quantum
+        //     //         << ") (Prioridade: " << currentProcess->priority << ")"
+        //     //         << ") (Intruções: " << currentProcess->instructions << ").\n";
+        // }
     }
 
     reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
@@ -201,11 +201,11 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
     switch (process.state.load()) {
         case State::Blocked:{
             std::lock_guard<std::mutex> lock(blockedQueueMutex);
-            {
-                std::lock_guard<std::mutex> lock(printMutex);
-                // std::cout << "[Scheduler] Processo " << process.pid
-                //         << " bloqueado por I/O. Entregando ao IOManager.\n";
-            }
+            // {
+            //     std::lock_guard<std::mutex> lock(printMutex);
+            //     // std::cout << "[Scheduler] Processo " << process.pid
+            //     //         << " bloqueado por I/O. Entregando ao IOManager.\n";
+            // }
             ioManager.registerProcessWaitingForIO(&process);
             blockedQueue.push_back(&process);
             break;
@@ -223,13 +223,13 @@ void Simulator::handleCompletion(PCB &process, int &finishedProcesses) {
             break;
         }
         default:{
-            {
-                std::lock_guard<std::mutex> lock(printMutex);
-                // std::cout << "[Scheduler] Quantum do processo " << process.pid
-                //         << " expirou. Voltando para a fila.\n";
-                // cout << "\n\n\n Iniciando preempção de processos \n\n\n";
+            // {
+            //     std::lock_guard<std::mutex> lock(printMutex);
+            //     // std::cout << "[Scheduler] Quantum do processo " << process.pid
+            //     //         << " expirou. Voltando para a fila.\n";
+            //     // cout << "\n\n\n Iniciando preempção de processos \n\n\n";
 
-            }
+            // }
             std::lock_guard<std::mutex> lock(readyQueueMutex);
             process.state.store(State::Ready);
             readyQueue.push_back(&process);

@@ -2,10 +2,7 @@
 
 MAIN_MEMORY::MAIN_MEMORY(size_t size)
 {
-    if (size > MAX_MEMORY_SIZE)
-        this->size = MAX_MEMORY_SIZE;
-    else
-        this->size = size;
+    this->size = size;
 
     this->ram.resize(this->size, MEMORY_ACCESS_ERROR);
 }

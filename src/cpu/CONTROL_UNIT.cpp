@@ -705,8 +705,12 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
     {
         std::lock_guard<std::mutex> guard(forwardingMutex);
-        exMemFwd.erase(data.writeRegisterName);
-        memWbFwd.erase(data.writeRegisterName);
+        if (data.hasAluResult) {
+            exMemFwd.erase(data.writeRegisterName);
+        }
+        if (data.hasLoadResult) {
+            memWbFwd.erase(data.writeRegisterName);
+        }
         data.writesRegister = false;
         data.writeRegisterName.clear();
         data.hasLoadResult = false;
@@ -776,6 +780,12 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
     std::atomic<bool> stopWatchdog{false};
 
     std::thread watchdogThread([&]() {
+        // Disable watchdog for FCFS (schedulerId == 4) to prevent premature termination of long-running processes
+        // if (schedulerId != 0 && schedulerId != 2) {
+        //     // std::cout << "[Watchdog] Disabled for FCFS (schedulerId=" << schedulerId << ")\n";
+        //     return;
+        // }
+
         uint64_t last = progressCounter.load(std::memory_order_relaxed);
         int stuckRounds = 0;
         while (!stopWatchdog.load(std::memory_order_relaxed)) {
