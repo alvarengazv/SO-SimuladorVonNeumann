@@ -63,7 +63,7 @@ Em comparação com implementações anteriores, este trabalho introduz mudança
 ## 2. ⚙️ Configuração
 
 ### Pré-requisitos
-O ambiente requer apenas um **Compilador C++17** (GCC, Clang ou MSVC) e **CMake** (3.10+) instalados.
+O ambiente requer apenas um **Compilador C++17** (GCC, Clang ou MSVC) e **Make** instalados.
 
 ### 2.1 Arquivo `system_config.json`
 
@@ -130,19 +130,24 @@ Todo o comportamento do hardware e do sistema operacional é definido no arquivo
 ##### **Memória Principal (`main_memory`)**
 | Parâmetro | Tipo | Descrição | Valores Típicos |
 | :--- | :--- | :--- | :--- |
-| `total` | `int` | Tamanho total da RAM em bytes. Define o espaço físico disponível para frames. | 4096-65536 bytes (simulação) |
-| `page_size` | `int` | Tamanho de cada página/frame em bytes. Deve ser potência de 2. | 256, 512, 1024, 4096 bytes |
+| `total` | `int` | Tamanho total da RAM em bytes. Define o espaço físico disponível para frames. | 256-65536 bytes (simulação) |
+| `page_size` | `int` | Tamanho de cada página/frame em bytes. Deve ser potência de 2. | 32, 256, 512, 1024, 4096 bytes |
 | `weight` | `int` | Custo em ciclos para acessar a RAM (latência). Representa o tempo de resposta da memória. | 50-200 ciclos |
+| `policy` | `int` | Política de substituição de páginas: <br>`0` = FIFO (First-In-First-Out) <br>`1` = LRU (Least Recently Used)  | 0 ou 1 |
 
 **Impacto:**
 - **`total`**: Define quantos processos simultâneos podem ser executados antes de exigir *swapping* para o disco.
 - **`page_size`**: Páginas maiores reduzem a fragmentação interna, mas aumentam o desperdício de memória se o processo usar pouco espaço.
 - **`weight`**: Latência alta da RAM incentiva o uso da cache.
+- **`policy`**: Política de substituição de páginas quando a RAM está cheia:
+  - **FIFO (0)**: Remove a página mais antiga (primeira a entrar).
+  - **LRU (1)**: Remove a página menos recentemente usada.
+  - **Clock (2)**: Aproximação eficiente de LRU usando bit de referência.
 
 **Cálculo do Número de Frames:**
 ```
 Número de frames = total / page_size
-Exemplo: 8192 bytes / 256 bytes = 32 frames
+Exemplo: 256 bytes / 32 bytes = 8 frames
 ```
 
 ---
@@ -287,13 +292,14 @@ Os processos são definidos em arquivos JSON na pasta `src/tasks/`. Cada arquivo
 ## 3. 🚀 Execução
 
 ### Compilação e build rápido
-O `Makefile` já encapsula o fluxo do CMake.
+O `Makefile` já encapsula o fluxo de compilação e execução.
 
 1. **Compilar:**
    ```bash
    make
    ```
-   Gera `build/` com binários.
+
+Gera os arquivos `*.o` e executa o programa.
 
 2. **Limpar e recompilar do zero:**
    ```bash
@@ -301,9 +307,10 @@ O `Makefile` já encapsula o fluxo do CMake.
    ```
 
 
+
+
 ### Dicas e troubleshooting rápido
 - **Arquivo de config não encontrado:** garanta o caminho correto (`src/system_config/system_config.json`) ou passe o caminho na linha de comando.
-- **Build quebrando por CMake:** rode `make clean` e verifique se o CMake (3.10+) está instalado.
 - **Mudanças em headers não refletiram:** faça `make clean` antes do `make` para forçar recompilação completa.
 
 <br><br><br>
@@ -1144,5 +1151,73 @@ O `CMakeLists.txt` foi configurado para criar atalhos úteis que você pode usar
 - Matheus Emanuel da Silva ([matheus-emanue123](https://github.com/matheus-emanue123))
 
 
+## 📨 Contato dos Responsáveis por este Repositório
+
+<div align="center">
+<i>Élcio Costa Amorim Neto - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor1]
+[![Linkedin][linkedin-badge]][linkedin-autor1]
+[![Telegram][telegram-badge]][telegram-autor1]
+
+<br><br>
+
+
+<i>Guilherme Alvarenga de Azevedo - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor2]
+[![Linkedin][linkedin-badge]][linkedin-autor2]
+[![Telegram][telegram-badge]][telegram-autor2]
+
+<br><br>
+
+
+<i>João Paulo Cunha Faria - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor3]
+[![Linkedin][linkedin-badge]][linkedin-autor3]
+[![Telegram][telegram-badge]][telegram-autor3]
+
+<br><br>
+
+
+<i>Maria Eduarda Teixeira Souza - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor4]
+[![Linkedin][linkedin-badge]][linkedin-autor4]
+[![Telegram][telegram-badge]][telegram-autor4]
 
 <p align="right">(<a href="#readme-topo">voltar ao topo</a>)</p>
+
+</div>
+
+[linkedin-badge]: https://img.shields.io/badge/-LinkedIn-0077B5?style=for-the-badge&logo=Linkedin&logoColor=white
+[telegram-badge]: https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white
+[gmail-badge]: https://img.shields.io/badge/-Gmail-D14836?style=for-the-badge&logo=Gmail&logoColor=white
+
+[linkedin-autor1]: https://www.linkedin.com/in/%C3%A9lcio-amorim-0210532a2/
+[telegram-autor1]: https://t.me
+[gmail-autor1]: mailto:elcioamorim12@gmail.com
+
+[linkedin-autor2]: https://www.linkedin.com/in/guilherme-alvarenga-de-azevedo-959474201/
+[telegram-autor2]: https://t.me/alvarengazv
+[gmail-autor2]: mailto:gui.alvarengas234@gmail.com
+
+[linkedin-autor3]: https://www.linkedin.com/in/jo%C3%A3o-paulo-cunha-faria/
+[telegram-autor3]:  https://t.me
+[gmail-autor3]: mailto:joaopaulofaria98@gmail.com
+
+[linkedin-autor4]: https://www.linkedin.com/in/dudatsouza/
+[telegram-autor4]: https://t.me/
+[gmail-autor4]: mailto:dudateixeirasouza@gmail.com
+
+</details>
+
+---
+
+<p align="right">(<a href="#readme-topo">voltar ao topo</a>)</p>
+
