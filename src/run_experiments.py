@@ -49,10 +49,10 @@ PATH_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 # --- MAPAS DE LEGENDAS (Para o CSV ficar legível) ---
 SCHEDULER_NAMES = {
     0: "Round Robin",
-    1: "FCFS",
-    2: "SJF",
-    3: "SRTF",
-    4: "Priority"
+    1: "SJF",
+    2: "Lottery",
+    3: "Priority",
+    4: "FCFS"
 }
 POLICY_NAMES = {
     0: "FIFO",
@@ -280,7 +280,7 @@ def run_full_factorial():
     base_config = load_json(PATH_CONFIG)
     
     # LISTAS DE VARIAÇÃO
-    # Schedulers: 0=RR, 1=FCFS, 2=SJF, 3=SRTF, 4=Priority
+    # Schedulers: 0=RR, 1=SJF, 2=LOTTERY, 3=Priority, 4=FCFS    
     schedulers = [0, 1, 2, 3, 4] 
     # Policies: 0=FIFO, 1=LRU
     cache_policies = [0, 1] 
