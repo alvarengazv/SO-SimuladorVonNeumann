@@ -21,12 +21,15 @@ de Von Neumann  Multicore com Escalonamento e Gerência de Memória
 
 ## 📖 Índice
 
-- [Introdução](#introdução)
-- [Configuração da Máquina](#configuração-da-máquina)
-  - [Pré-requisitos](#pré-requisitos)
-  - [Configuração do Sistema](#configuração-do-sistema)
-- [Execução](#execução)
-- [Link do Artigo](#link-do-artigo)
+- 🧭 [Introdução](#1--introdução)
+- 🛠️ [Configuração](#2--configuração)
+  - 📦 [Pré-requisitos](#pré-requisitos)
+  - 🗺️ [Arquivo `system_config.json`](#21-arquivo-system_configjson)
+  - 🧩 [Criando processos](#22-criando-processos-arquivos-tasksjson)
+  - 🧾 [Principais instruções MIPS](#23-principais-instruções-mips)
+  - ⏱️ [Exemplo: contador simples](#24-exemplo-contador-simples)
+- 🚀 [Execução](#execucao)
+- 📚 [Documentação do Projeto Base](#doc-base)
 
 ---
 
@@ -280,33 +283,110 @@ Os processos são definidos em arquivos JSON na pasta `src/tasks/`. Cada arquivo
 
 ---
 
+<a id="execucao"></a>
 ## 3. 🚀 Execução
 
-### Compilação
-O projeto utiliza um `Makefile` que abstrai os comandos do CMake.
+### Compilação e build rápido
+O `Makefile` já encapsula o fluxo do CMake.
 
-1.  **Compilar o projeto:**
-    ```bash
-    make
-    ```
-    Isso criará a pasta `build`, gerará os arquivos do CMake e compilará o executável.
+1. **Compilar:**
+   ```bash
+   make
+   ```
+   Gera `build/` com binários.
 
-2.  **Limpar arquivos temporários:**
-    Caso precise recompilar do zero:
-    ```bash
-    make clean
-    ```
-
+2. **Limpar e recompilar do zero:**
+   ```bash
+   make clean && make
+   ```
 
 
-## 📄 Link do Artigo
 
-**[Link do artigo será adicionado aqui]**
 
----
+### Testes
+Rodar alvos de teste (na pasta `build/`):
+
+```bash
+make test-all   # todos os testes
+make test_ula   # ULA
+make test_hash  # mapeador de registradores
+make test_bank  # banco de registradores
+make test_metrics  # métricas da CPU
+```
+
+### Dicas e troubleshooting rápido
+- **Arquivo de config não encontrado:** garanta o caminho correto (`src/system_config/system_config.json`) ou passe o caminho na linha de comando.
+- **Build quebrando por CMake:** rode `make clean` e verifique se o CMake (3.10+) está instalado.
+- **Mudanças em headers não refletiram:** faça `make clean` antes do `make` para forçar recompilação completa.
 
 <br><br><br>
 
+<a id="contato-equipe"></a>
+## 📨 Integrantes deste Projeto
+
+<div align="center">
+<i>Élcio Costa Amorim Neto - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor1]
+[![Linkedin][linkedin-badge]][linkedin-autor1]
+[![Telegram][telegram-badge]][telegram-autor1]
+
+<br><br>
+
+
+<i>Guilherme Alvarenga de Azevedo - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor2]
+[![Linkedin][linkedin-badge]][linkedin-autor2]
+[![Telegram][telegram-badge]][telegram-autor2]
+
+<br><br>
+
+
+<i>João Paulo Cunha Faria - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor3]
+[![Linkedin][linkedin-badge]][linkedin-autor3]
+[![Telegram][telegram-badge]][telegram-autor3]
+
+<br><br>
+
+
+<i>Maria Eduarda Teixeira Souza - Computer Engineering Student @ CEFET-MG</i>
+<br><br>
+
+[![Gmail][gmail-badge]][gmail-autor4]
+[![Linkedin][linkedin-badge]][linkedin-autor4]
+[![Telegram][telegram-badge]][telegram-autor4]
+
+<p align="right">(<a href="#introdução">voltar ao topo</a>)</p>
+
+</div>
+
+[linkedin-badge]: https://img.shields.io/badge/-LinkedIn-0077B5?style=for-the-badge&logo=Linkedin&logoColor=white
+[telegram-badge]: https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white
+[gmail-badge]: https://img.shields.io/badge/-Gmail-D14836?style=for-the-badge&logo=Gmail&logoColor=white
+
+[linkedin-autor1]: https://www.linkedin.com/in/%C3%A9lcio-amorim-0210532a2/
+[telegram-autor1]: https://t.me
+[gmail-autor1]: mailto:elcioamorim12@gmail.com
+
+[linkedin-autor2]: https://www.linkedin.com/in/guilherme-alvarenga-de-azevedo-959474201/
+[telegram-autor2]: https://t.me/alvarengazv
+[gmail-autor2]: mailto:gui.alvarengas234@gmail.com
+
+[linkedin-autor3]: https://www.linkedin.com/in/jo%C3%A3o-paulo-cunha-faria/
+[telegram-autor3]:  https://t.me
+[gmail-autor3]: mailto:joaopaulofaria98@gmail.com
+
+[linkedin-autor4]: https://www.linkedin.com/in/dudatsouza/
+[telegram-autor4]: https://t.me/
+[gmail-autor4]: mailto:dudateixeirasouza@gmail.com
+
+<a id="doc-base"></a>
 ## 📚 Documentação do Projeto Base (Trabalho Anterior)
 
 <details>
