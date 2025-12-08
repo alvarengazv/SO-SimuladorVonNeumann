@@ -74,9 +74,10 @@ Todo o comportamento do hardware e do sistema operacional é definido no arquivo
 ```json
 {
     "main_memory": {
-        "total": 8192,
-        "page_size": 256,
-        "weight": 50
+        "total": 256,
+        "page_size": 32,
+        "weight": 50,
+        "policy": 1
     },
     "secondary_memory": {
         "total": 65536,
@@ -84,8 +85,8 @@ Todo o comportamento do hardware e do sistema operacional é definido no arquivo
         "weight": 500
     },
     "cache": {
-        "size": 64,
-        "line_size": 64,
+        "size": 32,
+        "line_size": 16,
         "weight": 1,
         "policy": 1
     },
@@ -142,7 +143,7 @@ Todo o comportamento do hardware e do sistema operacional é definido no arquivo
 - **`policy`**: Política de substituição de páginas quando a RAM está cheia:
   - **FIFO (0)**: Remove a página mais antiga (primeira a entrar).
   - **LRU (1)**: Remove a página menos recentemente usada.
-  - **Clock (2)**: Aproximação eficiente de LRU usando bit de referência.
+
 
 **Cálculo do Número de Frames:**
 ```
