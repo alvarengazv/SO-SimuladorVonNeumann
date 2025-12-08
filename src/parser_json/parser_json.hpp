@@ -30,7 +30,7 @@ uint32_t buildBinaryInstruction(int opcode, int rs, int rt, int rd, int shamt, i
                                 int immediate, int address);
 
 uint32_t encodeRType(const nlohmann::json &instrJson);
-uint32_t encodeIType(const nlohmann::json &instrJson, int currentInstrIndex);
+uint32_t encodeIType(const nlohmann::json &instrJson, int currentAddress);
 uint32_t encodeJType(const nlohmann::json &instrJson);
 uint32_t encodePrintInstruction(const json &j);
 

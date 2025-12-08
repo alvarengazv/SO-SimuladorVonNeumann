@@ -5,7 +5,6 @@
 #include <vector>
 
 #define MEMORY_ACCESS_ERROR UINT32_MAX
-#define MAX_MEMORY_SIZE 1024
 
 using std::size_t;
 using std::uint32_t;

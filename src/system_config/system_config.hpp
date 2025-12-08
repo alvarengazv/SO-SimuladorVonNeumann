@@ -12,6 +12,7 @@ struct MainMemoryConfig {
     int total;
     int page_size;
     int weight;
+    int policy;
 };
 
 struct SecondaryMemoryConfig {
@@ -57,6 +58,7 @@ public:
         config.main_memory.total = j.at("main_memory").at("total").get<int>();
         config.main_memory.page_size = j.at("main_memory").at("page_size").get<int>();
         config.main_memory.weight = j.at("main_memory").at("weight").get<int>();
+        config.main_memory.policy = j.at("main_memory").at("policy").get<int>();
 
         config.secondary_memory.total = j.at("secondary_memory").at("total").get<int>();
         config.secondary_memory.block_size = j.at("secondary_memory").at("block_size").get<int>();

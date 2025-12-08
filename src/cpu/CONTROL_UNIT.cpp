@@ -1,23 +1,6 @@
 // control_unit_with_trace.cpp
-#include "pcb_loader.hpp"
-#include <fstream>
 #include "CONTROL_UNIT.hpp"
-#include "MemoryManager.hpp"
-#include "PCB.hpp"
-#include "../IO/IOManager.hpp"
-
-#include <bitset>
-#include <cmath>
-#include <stdexcept>
-#include <iostream>
-#include <algorithm>
-#include <sstream>
-#include <vector>
-#include <fstream>
-#include <mutex>
-#include <atomic>
-#include <condition_variable>
-#include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -54,7 +37,7 @@ static void log_forwarding_event(const std::string &msg) {
 }
 
 
-// Helpers
+// Funções auxiliares
 static uint32_t binaryStringToUint(const std::string &bin) {
     uint32_t value = 0;
     for (char c : bin) {
@@ -146,6 +129,36 @@ bool Control_Unit::readRegisterWithForwarding(const std::string &name,
     return true;
 }
 
+void Control_Unit::markLoadHazard(const std::string &regName) {
+    if (regName.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    loadHazardReg = regName;
+    loadHazardActive.store(true, std::memory_order_release);
+}
+
+void Control_Unit::clearLoadHazard(const std::string &regName) {
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    if (!regName.empty() && regName != loadHazardReg) {
+        return;
+    }
+    loadHazardReg.clear();
+    loadHazardActive.store(false, std::memory_order_release);
+}
+
+bool Control_Unit::isLoadHazardFor(const Instruction_Data &data) const {
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    if (!loadHazardActive.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (loadHazardReg.empty()) {
+        return false;
+    }
+    return (data.sourceRegisterName == loadHazardReg) ||
+           (data.targetRegisterName == loadHazardReg);
+}
+
 string Control_Unit::Get_immediate(const uint32_t instruction) {
     uint16_t imm = static_cast<uint16_t>(instruction & 0xFFFFu);
     return std::bitset<16>(imm).to_string();
@@ -167,66 +180,82 @@ string Control_Unit::Get_source_Register(const uint32_t instruction) {
 }
 
 string Control_Unit::Identificacao_instrucao(uint32_t instruction) {
+    // Extrai o opcode (bits 31-26)
     uint32_t opcode = (instruction >> 26) & 0x3Fu;
-    std::string opcode_bin = toBinStr(opcode, 6);
 
-    // Se existir mapa textual (instructionMap), mantenha compatibilidade
-    for (const auto &p : instructionMap) {
-        if (p.second == opcode_bin) {
-            std::string key = p.first;
-            for (auto &c : key) c = toupper(c);
-            return key;
-        }
-    }
-
-    // Tratamento por opcode numérico (MIPS-like / convenções comuns)
     switch (opcode) {
-        case 0x00: { // R-type: usa funct
-            uint32_t funct = instruction & 0x3Fu;
-            if (funct == 0x20) return "ADD";
-            if (funct == 0x22) return "SUB";
-            if (funct == 0x18) return "MULT";
-            if (funct == 0x1A) return "DIV";
-            // não reconhecido -> vazio
-            return "";
+        // --- Instruções do tipo R (Opcode 0) ---
+        case 0x00: { 
+            uint32_t funct = instruction & 0x3Fu; // Extrai o campo funct (bits 5-0)
+            switch (funct) {
+                case 0x20: return "ADD";   // 0b100000
+                case 0x22: return "SUB";   // 0b100010
+                case 0x24: return "AND";   // 0b100100
+                case 0x25: return "OR";    // 0b100101
+                case 0x18: return "MULT";  // 0b011000
+                case 0x1A: return "DIV";   // 0b011010
+                case 0x00: return "SLL";   // 0b000000
+                case 0x02: return "SRL";   // 0b000010
+                case 0x08: return "JR";    // 0b001000
+                default: return "";        // Funct desconhecido
+            }
         }
-        case 0x02: return "J";        // jump
-        case 0x03: return "JAL";
-        case 0x04: return "BEQ";
-        case 0x05: return "BNE";
-        case 0x08: return "ADDI";     // 001000
-        case 0x09: return "ADDIU";    // 001001
-        case 0x0F: return "LUI";      // 001111
-        case 0x0C: return "ANDI";     // 001100 (opcional)
-        case 0x0A: return "SLTI";     // 001010 (opcional)
-        case 0x23: return "LW";       // 100011
-        case 0x2B: return "SW";       // 101011
-        case 0x0E: return "LI";       // custom LI, se usado
-        case 0x10: return "PRINT";    // custom PRINT opcode, ajuste se necessário
-        case 0x3F: return "END";      // sentinel/END (se aplicável)
-        default:
-            return ""; // desconhecido
+
+        // --- Instruções do tipo I e J ---
+        case 0x02: return "J";      // 0b000010
+        case 0x03: return "JAL";    // 0b000011
+        case 0x04: return "BEQ";    // 0b000100
+        case 0x05: return "BNE";    // 0b000101
+        case 0x07: return "BGT";    // 0b000111
+        case 0x08: return "ADDI";   // 0b001000
+        case 0x09: return "BLT";    // 0b001001 (definição do parser prevalece sobre ADDIU)
+        case 0x0A: return "SLTI";   // 0b001010
+        case 0x0C: return "ANDI";   // 0b001100
+        case 0x0D: return "ORI";    // 0b001101
+        case 0x0F: return "LI";     // 0b001111 (definição do parser prevalece sobre LUI)
+        case 0x10: return "PRINT";  // 0b010000
+        case 0x23: return "LW";     // 0b100011
+        case 0x2B: return "SW";     // 0b101011
+        case 0x3F: return "END";    // 0b111111
+
+        default: return "";         // Opcode desconhecido
     }
 }
 
-uint32_t Control_Unit::FetchInstruction(ControlContext &context) {
+uint32_t Control_Unit::FetchInstruction(ControlContext &context, int &capturedEpoch, uint32_t &fetchedPC) {
     account_stage(context.process);
+
+    std::lock_guard<std::mutex> lock(pc_mutex);
+
+    capturedEpoch = global_epoch.load(std::memory_order_relaxed);
+
     uint32_t pcValue = context.registers.pc.read();
+
+    fetchedPC = pcValue;
+
     context.registers.mar.write(pcValue);
     uint32_t instr = context.memManager.read(pcValue, context.process);
     context.registers.ir.write(instr);
 
     if (instr != END_SENTINEL) {
         context.registers.pc.write(pcValue + 4);
-    } else {
-        context.endProgram.store(true, std::memory_order_relaxed);
-    }
+    } 
+    // else {
+    //     context.endProgram.store(true, std::memory_order_relaxed);
+    // }
 
     return instr;
 }
 
 void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
+    uint32_t saved_pc = data.pc; 
+    int saved_epoch = data.epoch;
+
     data = Instruction_Data{};
+
+    data.pc = saved_pc;
+    data.epoch = saved_epoch;
+
     data.rawInstruction = instruction;
     data.op = Identificacao_instrucao(instruction);
 
@@ -236,7 +265,7 @@ void Control_Unit::Decode(uint32_t instruction, Instruction_Data &data) {
         data.target_register = Get_target_Register(instruction);
         data.destination_register = Get_destination_Register(instruction);
 
-    // I-type: ADDI, ADDIU, LI, LW, LA, SW, and branches / custom immediates
+    // Tipo I: ADDI, ADDIU, LI, LW, LA, SW e branches / immediates customizados
     } else if (data.op == "ADDI" || data.op == "ADDIU" ||
                data.op == "LI" || data.op == "LW" || data.op == "LA" || data.op == "SW" ||
                data.op == "BGTI" || data.op == "BLTI" || data.op == "BEQ" || data.op == "BNE" ||
@@ -329,10 +358,10 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
         }
         forwardingCv.notify_all();
 
-        ss << "[IMM] " << data.op << " "
-           << name_rt << " = " << name_rs << "(" << val_rs << ") + "
-           << imm << " -> " << alu.result;
-        log_operation(ss.str());
+        // ss << "[IMM] " << data.op << " "
+        //    << name_rt << " = " << name_rs << "(" << val_rs << ") + "
+        //    << imm << " -> " << alu.result;
+        // log_operation(ss.str());
         return;
     }
 
@@ -349,9 +378,9 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
         }
         forwardingCv.notify_all();
 
-        ss << "[IMM] SLTI " << name_rt << " = (" << name_rs << "(" << val_rs
-           << ") < " << imm << ") ? 1 : 0 -> " << res;
-        log_operation(ss.str());
+        // ss << "[IMM] SLTI " << name_rt << " = (" << name_rs << "(" << val_rs
+        //    << ") < " << imm << ") ? 1 : 0 -> " << res;
+        // log_operation(ss.str());
         return;
     }
 
@@ -369,9 +398,9 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
         }
         forwardingCv.notify_all();
 
-        ss << "[IMM] LUI " << name_rt << " = (0x" << std::hex << imm
-           << " << 16) -> 0x" << val << std::dec;
-        log_operation(ss.str());
+        // ss << "[IMM] LUI " << name_rt << " = (0x" << std::hex << imm
+        //    << " << 16) -> 0x" << val << std::dec;
+        // log_operation(ss.str());
         return;
     }
 
@@ -387,15 +416,15 @@ void Control_Unit::Execute_Immediate_Operation(ControlContext &context, Instruct
         }
         forwardingCv.notify_all();
 
-        ss << "[IMM] LI " << name_rt << " = " << imm;
-        log_operation(ss.str());
+        // ss << "[IMM] LI " << name_rt << " = " << imm;
+        // log_operation(ss.str());
         return;
     }
 
     // Caso não mapeado
-    ss << "[IMM] UNKNOWN OP: " << data.op
-       << " rs=" << name_rs << " imm=" << imm;
-    log_operation(ss.str());
+    // ss << "[IMM] UNKNOWN OP: " << data.op
+    //    << " rs=" << name_rs << " imm=" << imm;
+    // log_operation(ss.str());
 }
 
 void Control_Unit::Execute_Aritmetic_Operation(ControlContext &context, Instruction_Data &data) {
@@ -434,20 +463,21 @@ void Control_Unit::Execute_Aritmetic_Operation(ControlContext &context, Instruct
         data.writesRegister = true;
         data.hasAluResult = true;
         data.aluResult = alu.result;
-        exMemFwd[name_rt] = alu.result;
+        exMemFwd[name_rd] = alu.result;
     }
     forwardingCv.notify_all();
 
     std::ostringstream ss;
-    ss << "[ARIT] " << data.op << " " << name_rd
-       << " = " << name_rs << "(" << val_rs << ") "
-       << data.op << " " << name_rt << "(" << val_rt << ") = "
-       << alu.result;
-    log_operation(ss.str());
+    // ss << "[ARIT] " << data.op << " " << name_rd
+    //    << " = " << name_rs << "(" << val_rs << ") "
+    //    << data.op << " " << name_rt << "(" << val_rt << ") = "
+    //    << alu.result;
+    // log_operation(ss.str());
 }
 
 void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &context) {
     if (data.op == "PRINT") {
+        // std::cout << "[EXEC] Operação PRINT para o processo PID " << context.process.pid << "\n";
         if (!data.target_register.empty()) {
             string name = this->map.getRegisterName(binaryStringToUint(data.target_register));
             int32_t value = 0;
@@ -463,14 +493,14 @@ void Control_Unit::Execute_Operation(Instruction_Data &data, ControlContext &con
                 context.ioRequests.push_back(std::move(req));
             }
 
-            // TRACE PRINT from register
-            std::cout << "[PRINT-REQ] PRINT REG " << name << " value=" << value
-                      << " (pid=" << context.process.pid << ")\n";
+            // TRACE PRINT do registrador
+            // std::cout << "[PRINT-REQ] PRINT REG " << name << " valor=" << value
+            //           << " (pid=" << context.process.pid << ")\n";
 
-            if (context.printLock.load(std::memory_order_relaxed)) {
-                context.process.state.store(State::Blocked);
-                context.endExecution.store(true);
-            }
+            // if (context.printLock.load(std::memory_order_relaxed)) {
+            //     context.process.state.store(State::Blocked);
+            //     context.endExecution.store(true);
+            // }
         }
     }
 }
@@ -479,18 +509,26 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
     std::string name_rs = data.sourceRegisterName;
     std::string name_rt = data.targetRegisterName;
 
-    if (name_rs.empty()) {
-        return;
-    }
-
     int32_t operandA = 0;
-    if (!readRegisterWithForwarding(name_rs, data, context, operandA)) {
-        throw std::runtime_error("Hazard forwarding falhou para " + name_rs);
-    }
-
     int32_t operandB = 0;
-    if (!name_rt.empty() && !readRegisterWithForwarding(name_rt, data, context, operandB)) {
-            throw std::runtime_error("Hazard forwarding falhou para " + name_rt);
+
+    if (data.op != "J") {
+        std::string name_rs = data.sourceRegisterName;
+        std::string name_rt = data.targetRegisterName;
+
+        if (name_rs.empty()) {
+            return;
+        }
+
+        if (!readRegisterWithForwarding(name_rs, data, context, operandA)) {
+            throw std::runtime_error("Hazard forwarding falhou para " + name_rs);
+        }
+
+        if (!name_rt.empty()) {
+            if (!readRegisterWithForwarding(name_rt, data, context, operandB)) {
+                throw std::runtime_error("Hazard forwarding falhou para " + name_rt);
+            }
+        }
     }
 
     ALU alu;
@@ -504,11 +542,29 @@ void Control_Unit::Execute_Loop_Operation(Instruction_Data &data, ControlContext
     else if (data.op == "BLT") { alu.op = BLT; alu.calculate(); jump = (alu.result == 1); }
     else if (data.op == "BGT") { alu.op = BGT; alu.calculate(); jump = (alu.result == 1); }
 
-    if (jump && !data.addressRAMResult.empty()) {
-        uint32_t addr = binaryStringToUint(data.addressRAMResult);
-        context.registers.pc.write(addr);
+    if (jump) {
+        std::lock_guard<std::mutex> lock(pc_mutex);
+
+        global_epoch.fetch_add(1, std::memory_order_relaxed);
+        if (data.op == "J") {
+            // std::cout << "[JUMP] Saltando para o endereço da instrução: "
+            //   << "0x" << std::hex << binaryStringToUint(data.addressRAMResult) << std::dec << "\n";
+            // uint32_t addr = static_cast<uint32_t>(data.immediate);
+            // context.registers.pc.write(addr);
+            uint32_t target = static_cast<uint32_t>(data.immediate);
+            context.registers.pc.write(target);
+        } else {
+            int32_t offset = data.immediate;
+            // uint32_t nextPc = context.registers.pc.read();
+            // uint32_t target = static_cast<uint32_t>(nextPc + (offset << 2));
+            // context.registers.pc.write(target);
+            
+            uint32_t target = (data.pc + 4) + (offset << 2);
+            
+            context.registers.pc.write(target);
+        }
         FlushPipeline(context);
-        context.endProgram.store(false, std::memory_order_relaxed);
+        
     }
 }
 
@@ -528,6 +584,11 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
             return false;
         }
     };
+
+    if (data.op == "END") {
+        context.endProgram.store(true, std::memory_order_relaxed);
+        return; 
+    }
 
     if (data.op == "LW") {
         if (assignAddress() && !data.targetRegisterName.empty()) {
@@ -563,14 +624,14 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
         return;
     }
 
-    // Immediates / I-type arithmetic
+    // Imediatos / aritmética tipo I
     if (data.op == "ADDI" || data.op == "ADDIU" || data.op == "SLTI" || data.op == "LUI" ||
         data.op == "LI") {
         Execute_Immediate_Operation(context, data);
         return;
     }
 
-    // R-type
+    // Tipo R
     if (data.op == "ADD" || data.op == "SUB" || data.op == "MULT" || data.op == "DIV") {
         Execute_Aritmetic_Operation(context, data);
     } else if (data.op == "BEQ" || data.op == "J" || data.op == "BNE" || data.op == "BGT" || data.op == "BGTI" || data.op == "BLT" || data.op == "BLTI") {
@@ -580,7 +641,7 @@ void Control_Unit::Execute(Instruction_Data &data, ControlContext &context) {
     }
 }
 
-void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context) {
+void Control_Unit::Memory_Access(Instruction_Data &data, ControlContext &context) {
     account_stage(context.process);
 
     if (data.pendingMemoryRead && data.hasEffectiveAddress) {
@@ -592,6 +653,7 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
             data.pendingMemoryRead = false;
             memWbFwd[data.writeRegisterName] = value;
         }
+        clearLoadHazard(data.writeRegisterName);
         forwardingCv.notify_all();
     }
 
@@ -612,10 +674,10 @@ void Control_Unit::Memory_Acess(Instruction_Data &data, ControlContext &context)
             context.ioRequests.push_back(std::move(req));
         }
 
-        if (context.printLock.load(std::memory_order_relaxed)) {
-            context.process.state.store(State::Blocked);
-            context.endExecution.store(true);
-        }
+        // if (context.printLock.load(std::memory_order_relaxed)) {
+        //     context.process.state.store(State::Blocked);
+        //     context.endExecution.store(true);
+        // }
     }
 }
 
@@ -643,8 +705,12 @@ void Control_Unit::Write_Back(Instruction_Data &data, ControlContext &context) {
     context.registers.writeRegister(data.writeRegisterName, static_cast<uint32_t>(value));
     {
         std::lock_guard<std::mutex> guard(forwardingMutex);
-        exMemFwd.erase(data.writeRegisterName);
-        memWbFwd.erase(data.writeRegisterName);
+        if (data.hasAluResult) {
+            exMemFwd.erase(data.writeRegisterName);
+        }
+        if (data.hasLoadResult) {
+            memWbFwd.erase(data.writeRegisterName);
+        }
         data.writesRegister = false;
         data.writeRegisterName.clear();
         data.hasLoadResult = false;
@@ -657,14 +723,22 @@ void Control_Unit::FlushPipeline(ControlContext &context) {
     if (context.flushPipeline) {
         context.flushPipeline();
     }
+
+    std::lock_guard<std::mutex> guard(loadHazardMutex);
+    loadHazardReg.clear();
+    loadHazardActive.store(false, std::memory_order_release);
 }
 
 // A função Core agora utiliza um buffer entre estágios e cinco threads dedicadas
 void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IORequest>>* ioRequests, std::atomic<bool> &printLock, int schedulerId) {
     Control_Unit UC;
 
+    if (process.startTime.load() == 0) {
+    process.startTime.store(process.timeStamp); // ou use um contador global do simulador
+}
     std::atomic<bool> endProgram{false};
     std::atomic<bool> endExecution{false};
+    std::mutex pcMutex;
 
     ControlContext context{ process.regBank, memoryManager, *ioRequests, printLock, process, endProgram, endExecution };
 
@@ -673,10 +747,29 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
     PipelineRegister exMem;
     PipelineRegister memWb;
 
+    std::atomic<uint64_t> progressCounter{0};
+    auto markProgress = [&progressCounter]() {
+        progressCounter.fetch_add(1, std::memory_order_relaxed);
+    };
+
+    auto logRegs = [&]() {
+        std::cerr << "[watchdog] pid=" << process.pid
+                  << " ifId tok=" << ifId.debugHasToken() << " stop=" << ifId.debugStopped()
+                  << " idEx tok=" << idEx.debugHasToken() << " stop=" << idEx.debugStopped()
+                  << " exMem tok=" << exMem.debugHasToken() << " stop=" << exMem.debugStopped()
+                  << " memWb tok=" << memWb.debugHasToken() << " stop=" << memWb.debugStopped()
+                  << " endExec=" << endExecution.load(std::memory_order_relaxed)
+                  << " endProg=" << context.endProgram.load(std::memory_order_relaxed)
+                  << " epoch=" << UC.global_epoch.load(std::memory_order_relaxed)
+                  << " progress=" << progressCounter.load(std::memory_order_relaxed)
+                  << "\n";
+    };
+
     context.flushPipeline = [&]() {
         ifId.flush();
         idEx.flush();
     };
+
 
     std::atomic<int> issuedCycles{0};
 
@@ -687,6 +780,73 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
         return drain;
     };
 
+    std::atomic<bool> stopWatchdog{false};
+
+    std::thread watchdogThread([&]() {
+        // Disable watchdog for FCFS (schedulerId == 4) to prevent premature termination of long-running processes
+        // if (schedulerId != 0 && schedulerId != 2) {
+        //     // std::cout << "[Watchdog] Disabled for FCFS (schedulerId=" << schedulerId << ")\n";
+        //     return;
+        // }
+
+        uint64_t last = progressCounter.load(std::memory_order_relaxed);
+        int stuckRounds = 0;
+        while (!stopWatchdog.load(std::memory_order_relaxed)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            uint64_t now = progressCounter.load(std::memory_order_relaxed);
+            if (now == last) {
+                ++stuckRounds;
+                // std::cerr << "[watchdog] pipeline não avançou por 5ms (pid="
+                //           << process.pid << ")\n";
+                // logRegs();
+
+                bool idle = !ifId.debugHasToken() && !idEx.debugHasToken() &&
+                            !exMem.debugHasToken() && !memWb.debugHasToken();
+                if (idle && !endExecution.load(std::memory_order_relaxed) &&
+                    !context.endProgram.load(std::memory_order_relaxed)) {
+                    endExecution.store(true, std::memory_order_relaxed);
+                    ifId.push(makeDrainToken(false));
+                    markProgress();
+                    ifId.stop();
+                    idEx.stop();
+                    exMem.stop();
+                    memWb.stop();
+                }
+
+
+                // Se o pipeline não estiver ocioso, mas permanecer travado, force uma
+                // reinicialização para evitar livelock (por exemplo, um thread de estágio esperando para sempre)
+                if (!idle && stuckRounds >= 3 &&
+                    !endExecution.load(std::memory_order_relaxed) &&
+                    !context.endProgram.load(std::memory_order_relaxed)) {
+                    // std::cerr << "[watchdog] forçando reset do pipeline após travamento (pid="
+                    //           << process.pid << ")\n";
+                    UC.clearLoadHazard("");
+
+                    PipelineToken stuck = ifId.debugPeek();
+                    if (stuck.entry && stuck.valid) {
+                        context.registers.pc.write(stuck.entry->pc);
+                    }
+
+                    endExecution.store(true, std::memory_order_relaxed);
+                    ifId.flush();
+                    idEx.flush();
+                    exMem.flush();
+                    memWb.flush();
+                    ifId.push(makeDrainToken(context.endProgram.load(std::memory_order_relaxed)));
+                    markProgress();
+                    ifId.stop();
+                    idEx.stop();
+                    exMem.stop();
+                    memWb.stop();
+                }
+            } else {
+                stuckRounds = 0;
+            }
+            last = now;
+        }
+    });
+
     std::thread fetchThread([&]() {
         bool drainSent = false;
         while (true) {
@@ -694,23 +854,49 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
                 break;
             }
 
-            uint32_t instruction = UC.FetchInstruction(context);
             if (context.endProgram.load(std::memory_order_relaxed)) {
                 drainSent = true;
                 ifId.push(makeDrainToken(true));
+                markProgress();
+                break;
+            }
+
+            int fetchEpoch = 0;
+            uint32_t fetchedPC = 0;
+
+            uint32_t instruction = UC.FetchInstruction(context, fetchEpoch, fetchedPC);
+
+            if (instruction == END_SENTINEL) {
+                // Adicione um END token e um drain; deixe o estágio Execute definir endProgram quando executar END.
+                PipelineToken token;
+                token.entry = &UC.data.emplace_back();
+                token.entry->epoch = fetchEpoch;
+                token.entry->pc = fetchedPC;
+                token.valid = true;
+                token.instruction = instruction;
+                ifId.push(token);
+                markProgress();
+
+                ifId.push(makeDrainToken(false));
+                markProgress();
                 break;
             }
 
             PipelineToken token;
             token.entry = &UC.data.emplace_back();
+
+            token.entry->epoch = fetchEpoch;
+            
+            token.entry->pc = fetchedPC;
             token.valid = true;
             token.instruction = instruction;
             ifId.push(token);
+            markProgress();
 
             issuedCycles.fetch_add(1, std::memory_order_relaxed);
             account_pipeline_cycle(process);
 
-            if (schedulerId == 0 && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
+            if ((schedulerId == 0 || schedulerId == 2 ) && issuedCycles.load(std::memory_order_relaxed) >= process.quantum) {
                 endExecution.store(true, std::memory_order_relaxed);
                 break;
             }
@@ -719,59 +905,126 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
         if (!drainSent) {
             bool programEndedFlag = context.endProgram.load(std::memory_order_relaxed);
             ifId.push(makeDrainToken(programEndedFlag));
+            markProgress();
+        }
+
+        // Se uma preempção ocorreu (endExecution) sem o fim do programa, acorde o
+        // pipeline com um token de drenagem e sinais de parada não destrutivos para que
+        // os threads de estágio saiam de seus loops de espera sem descartar o trabalho em andamento.
+        if (endExecution.load(std::memory_order_relaxed) &&
+            !context.endProgram.load(std::memory_order_relaxed)) {
+            ifId.push(makeDrainToken(false));
+            markProgress();
+            ifId.stop();
+            idEx.stop();
+            exMem.stop();
+            memWb.stop();
         }
     });
 
     std::thread decodeThread([&]() {
         PipelineToken token;
         while (ifId.pop(token)) {
+            markProgress();
             if (token.terminate) {
                 idEx.push(token);
+                markProgress();
                 break;
             }
             if (!token.valid) {
                 continue;
             }
+
+            int local_epoch = token.entry->epoch;
+            if (local_epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                // Token veio de um epoch obsoleto (por exemplo, após branch/flush). Qualquer
+                // hazard de load pendente desse epoch pode ser limpo com segurança; caso contrário,
+                // o Decode pode ficar parado para sempre esperando um load que nunca chegará ao MEM/WB.
+                UC.clearLoadHazard("");
+                continue;
+            }
+
             account_stage(context.process);
             UC.Decode(token.instruction, *token.entry);
+
+            token.entry->epoch = local_epoch;
+
+            if (local_epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                continue;
+            }
+
+            auto hazardStart = std::chrono::steady_clock::now();
+            while (UC.isLoadHazardFor(*token.entry)) {
+                // Escape de segurança: se um hazard de load nunca limpar (por exemplo,
+                // a instrução produtora foi descartada ou preemptada), quebre o
+                // stall para evitar deadlock. Isso preserva progresso, ao custo de
+                // possivelmente ler um valor desatualizado.
+                auto now = std::chrono::steady_clock::now();
+                if (now - hazardStart > std::chrono::milliseconds(50)) {
+                    UC.clearLoadHazard(token.entry->targetRegisterName);
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::microseconds(20));
+            }
+
+            if (token.entry->op == "LW" && !token.entry->targetRegisterName.empty()) {
+                UC.markLoadHazard(token.entry->targetRegisterName);
+            }
+
             token.instruction = 0;
             idEx.push(token);
+            markProgress();
         }
     });
 
     std::thread executeThread([&]() {
         PipelineToken token;
         while (idEx.pop(token)) {
+            markProgress();
             if (token.terminate) {
                 exMem.push(token);
+                markProgress();
                 break;
             }
             if (!token.valid) {
                 continue;
             }
+
+            if (token.entry->epoch != UC.global_epoch.load(std::memory_order_relaxed)) {
+                // A instrução ficou obsoleta após mudança de fluxo; limpe qualquer
+                // hazard de load pendente para o Decode não ficar parado.
+                UC.clearLoadHazard("");
+                continue;
+            }
+
             UC.Execute(*token.entry, context);
             exMem.push(token);
+            markProgress();
         }
     });
 
     std::thread memoryThread([&]() {
         PipelineToken token;
         while (exMem.pop(token)) {
+            markProgress();
             if (token.terminate) {
                 memWb.push(token);
+                markProgress();
                 break;
             }
             if (!token.valid) {
                 continue;
             }
-            UC.Memory_Acess(*token.entry, context);
+            UC.Memory_Access(*token.entry, context);
             memWb.push(token);
+            markProgress();
         }
     });
 
     std::thread writeThread([&]() {
         PipelineToken token;
         while (memWb.pop(token)) {
+            markProgress();
             if (token.terminate) {
                 if (token.programEnded) {
                     context.endProgram.store(true, std::memory_order_relaxed);
@@ -790,6 +1043,9 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
     executeThread.join();
     memoryThread.join();
     writeThread.join();
+
+    stopWatchdog.store(true, std::memory_order_relaxed);
+    watchdogThread.join();
 
     process.timeStamp += issuedCycles.load(std::memory_order_relaxed);
 
@@ -819,11 +1075,14 @@ void* Core(MemoryManager &memoryManager, PCB &process, vector<unique_ptr<IOReque
             // Ignora erros durante o dump
         }
 
-        std::cout << "PC = " << context.registers.pc.read() << "\n";
-        std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
-                  << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
-        std::cout << "========================================\n\n";
+        // std::cout << "PC = " << context.registers.pc.read() << "\n";
+        // std::cout << "IR = 0x" << std::hex << context.registers.ir.read() << std::dec
+        //           << " (" << toBinStr(context.registers.ir.read(), 32) << ")\n";
+        // std::cout << "========================================\n\n";
     }
+
+   // Depois de todas as threads terem feito join e atualizado timeStamp
+    process.burstTime.fetch_add(issuedCycles.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
     return nullptr;
 }

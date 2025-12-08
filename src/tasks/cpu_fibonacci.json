@@ -1,0 +1,17 @@
+{
+  "metadata": { "name": "cpu_fibonacci", "description": "Fibonacci (CPU Bound)" },
+  "data": { "limit": 20 },
+  "program": [
+    { "instruction": "li", "rt": "$t0", "immediate": 0 },
+    { "instruction": "li", "rt": "$t1", "immediate": 1 },
+    { "instruction": "lw", "rt": "$t2", "base": "limit" },
+    { "instruction": "li", "rt": "$t3", "immediate": 0 },
+    { "label": "fib_loop", "instruction": "add", "rd": "$t4", "rs": "$t0", "rt": "$t1" },
+    { "instruction": "add", "rd": "$t0", "rs": "$t1", "rt": "$zero" },
+    { "instruction": "add", "rd": "$t1", "rs": "$t4", "rt": "$zero" },
+    { "instruction": "addi", "rt": "$t3", "rs": "$t3", "immediate": 1 },
+    { "instruction": "blt", "rs": "$t3", "rt": "$t2", "dest": "fib_loop" },
+    { "instruction": "print", "rt": "$t0" },
+    { "instruction": "end" }
+  ]
+}

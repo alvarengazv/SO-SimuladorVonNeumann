@@ -18,7 +18,7 @@ ProcessScheduler::ProcessScheduler(int schedulerInt, vector<PCB *> process)
 
     case 2:
         this->setQuantum();
-        this->setTimeStamp();
+        this->setTickets();
         break;
 
     case 3:
@@ -71,6 +71,31 @@ void ProcessScheduler::setTimeStamp()
     }
 }
 
+void ProcessScheduler::setTickets()
+{
+    if (this->process.empty()) return;
+
+    int maxInstr = 0;
+    for (auto *p : this->process) {
+        if (p && p->instructions > maxInstr) maxInstr = p->instructions;
+    }
+
+    const int minTickets = 1;
+    const int maxTickets = 20; 
+    
+    if (maxInstr <= 0) {
+        for (auto *p : this->process) if (p) p->tickets = minTickets;
+        return;
+    }
+
+    for (auto *p : this->process) {
+        if (!p) continue;
+        int scaled = static_cast<int>((static_cast<double>(p->instructions) / maxInstr) * maxTickets + 0.5);
+        if (scaled < minTickets) scaled = minTickets;
+        p->tickets = scaled;
+    }
+}
+
 PCB *ProcessScheduler::scheduler(vector<PCB *> process)
 {
 
@@ -86,7 +111,7 @@ PCB *ProcessScheduler::scheduler(vector<PCB *> process)
         break;
 
     case 2:
-        return shortest_remainign_time_first(process);
+        return lotterySelect(process);
         break;
 
     case 3:
@@ -115,28 +140,6 @@ PCB *ProcessScheduler::shortest_job_first(vector<PCB *> process)
     return selected_process;
 }
 
-PCB *ProcessScheduler::shortest_remainign_time_first(vector<PCB *> process)
-{
-    if (process.empty())
-        return nullptr;
-
-    PCB *selected_process = nullptr;
-    int min_remaining_time = std::numeric_limits<int>::max();
-
-    for (const auto &p : process)
-    {
-        int remaining_time = p->instructions - p->timeStamp;
-
-        if (remaining_time < min_remaining_time)
-        {
-            min_remaining_time = remaining_time;
-            selected_process = p;
-        }
-    }
-
-    return (selected_process != nullptr) ? selected_process : process.front();
-}
-
 PCB *ProcessScheduler::round_robin(vector<PCB *> process)
 {
     if (process.empty())
@@ -160,6 +163,29 @@ PCB *ProcessScheduler::priority(vector<PCB *> process)
         }
     }
     return selected_process;
+}
+
+PCB *ProcessScheduler::lotterySelect(const std::vector<PCB *> &readyQueue)
+{
+    if (readyQueue.empty()){
+        return nullptr;
+    }
+    
+    uint64_t total = 0;
+    for (auto *p : readyQueue)
+    {
+        total += std::max(1, p->tickets);
+    }
+    std::uniform_int_distribution<uint64_t> dist(1, total);
+    uint64_t pick = dist(rng);
+    for (auto *p : readyQueue)
+    {
+        uint64_t t = std::max(1, p->tickets);
+        if (pick <= t)
+            return p;
+        pick -= t;
+    }
+    return readyQueue.front();
 }
 
 PCB *ProcessScheduler::first_come_first_served(vector<PCB *> process)

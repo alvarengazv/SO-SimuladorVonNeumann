@@ -18,7 +18,6 @@ include_directories(src)
 set(SIMULATOR_SOURCES
     src/main.cpp
     src/cpu/CONTROL_UNIT.cpp
-    src/cpu/pcb_loader.cpp
     src/cpu/datapath/REGISTER_BANK.cpp
     src/cpu/datapath/ULA.cpp
     src/cpu/cache/cache.cpp
@@ -54,7 +53,6 @@ add_executable(test_ula src/test/teste_alu.cpp src/cpu/datapath/ULA.cpp)
 add_executable(test_metrics 
     src/test/test_cpu_metrics.cpp 
     src/cpu/CONTROL_UNIT.cpp 
-    src/cpu/pcb_loader.cpp 
     src/cpu/datapath/ULA.cpp 
     src/cpu/datapath/REGISTER_BANK.cpp
     src/cpu/MemoryManager.cpp

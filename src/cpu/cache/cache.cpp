@@ -1,6 +1,6 @@
 #include "cache.hpp"
 
-Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
+Cache::Cache(size_t numLines, size_t wordsPerLine, PolicyType policy)
         : capacity(numLines),
         wordsPerLine(wordsPerLine),
         cache_hits(0),
@@ -15,7 +15,7 @@ Cache::Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy)
 }
 
 Cache::~Cache() {
-   std::lock_guard<std::mutex> lock(cacheMutex);
+   std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     // Limpa estruturas necessárias
     lruPos.clear();
@@ -26,12 +26,14 @@ Cache::~Cache() {
 }
 
 // Decodifica endereço em tag e offset, retornando struct AddressDecoded
-AddressDecoded Cache::decodeAddress(uint32_t address) const {
+AddressDecoded Cache::decodeAddress(uint32_t address, int pid) const {
     size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
 
     AddressDecoded info;
-
-    info.tag = address / blockSizeBytes;
+    // Include PID in tag to provide cache isolation between processes
+    // Shift PID to upper bits and combine with block address
+    size_t blockAddr = address / blockSizeBytes;
+    info.tag = (static_cast<size_t>(pid) << 24) | blockAddr;
     info.wordOffset = (address % blockSizeBytes) / sizeof(uint32_t);
 
     return info;
@@ -39,14 +41,15 @@ AddressDecoded Cache::decodeAddress(uint32_t address) const {
 
 // Leitura da cache
 uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
-    AddressDecoded info = decodeAddress(address);
+    AddressDecoded info = decodeAddress(address, process.pid);
 
     auto it = blockTagToLine.find(info.tag);
     if (it != blockTagToLine.end()) {
         // HIT
         cache_hits++;
+        contabiliza_cache(process, true, "read");
         size_t lineIndex = it->second;
 
         updateReplacementPolicy(lineIndex);
@@ -54,6 +57,7 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
     } else {
         // MISS
         cache_misses++;
+        contabiliza_cache(process, false, "read");
 
         // Carrega o bloco da memória principal para a cache
         size_t lineIndex = getLineToEvict();
@@ -66,9 +70,9 @@ uint32_t Cache::read(uint32_t address, MemoryManager* mem, PCB& process) {
 
 // Escrita da cache
 void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& process) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
-    AddressDecoded info = decodeAddress(address);
+    AddressDecoded info = decodeAddress(address, process.pid);
 
     auto it = blockTagToLine.find(info.tag);
     size_t lineIndex;
@@ -76,12 +80,14 @@ void Cache::write(uint32_t address, uint32_t data, MemoryManager* mem, PCB& proc
     if (it != blockTagToLine.end()) {
         // HIT
         cache_hits++;
+        contabiliza_cache(process, true, "write");
         lineIndex = it->second;
 
         updateReplacementPolicy(lineIndex);
     } else {
         // MISS → write-allocate
         cache_misses++;
+        contabiliza_cache(process, false, "write");
 
         // Carrega o bloco da memória principal para a cache
         lineIndex = getLineToEvict();
@@ -99,11 +105,13 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
     CacheLine& line = lines[lineIndex];
 
     size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
-    uint32_t baseAddress = blockTag * blockSizeBytes;
+    // Extract the address part from the tag (lower 24 bits) since upper bits contain PID
+    uint32_t blockAddr = blockTag & 0xFFFFFF;
+    uint32_t baseAddress = blockAddr * blockSizeBytes;
 
     for (size_t i = 0; i < wordsPerLine; i++) {
         uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-        line.data[i] = mem->read(wordAddress, process);
+        line.data[i] = mem->readFromPhysical(wordAddress, process);
     }
 
     line.tag = blockTag;
@@ -116,7 +124,7 @@ void Cache::loadBlock(size_t blockTag, size_t lineIndex, MemoryManager* mem, PCB
     // Atualiza política de substituição
     updateReplacementPolicy(lineIndex);
 
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         fifoQueue.push(lineIndex);
     }
 }
@@ -127,11 +135,13 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
     if (line.valid && line.dirty) {
         size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
-        uint32_t baseAddress = line.tag * blockSizeBytes;
+        // Extract the address part from the tag (lower 24 bits) since upper bits contain PID
+        uint32_t blockAddr = line.tag & 0xFFFFFF;
+        uint32_t baseAddress = blockAddr * blockSizeBytes;
 
         for (size_t i = 0; i < wordsPerLine; ++i) {
             uint32_t wordAddress = baseAddress + (i * sizeof(uint32_t));
-            mem->writeToFile(wordAddress, line.data[i], process);
+            mem->writeToPhysical(wordAddress, line.data[i], process);
         }
     }
 
@@ -146,7 +156,7 @@ void Cache::evictLine(size_t lineIndex, MemoryManager* mem, PCB& process) {
 
 // Invalida toda a cache
 void Cache::invalidate() {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
 
     for (size_t i = 0; i < capacity; ++i) {
         CacheLine& line = lines[i];
@@ -186,22 +196,26 @@ size_t Cache::getLineToEvict() {
 
     size_t victimIndex;
 
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         // A CachePolicy remove da fila e retorna o índice
-        victimIndex = policyHandler.getAddressToReplace(fifoQueue);
+        // victimIndex = policyHandler.getAddressToReplace(fifoQueue);
         
         // Verificação de segurança (caso a fila estivesse vazia, retornaria max)
-        if (victimIndex == std::numeric_limits<size_t>::max()) {
+        if (fifoQueue.empty()) {
             throw std::runtime_error("Erro: Tentativa de evict em fila FIFO vazia.");
         }
+        victimIndex = fifoQueue.front();
+        fifoQueue.pop();
 
     } else { // LRU
         // A CachePolicy remove do final da lista (back) e retorna o índice
-        victimIndex = policyHandler.getAddressToReplace(lruOrder);
+        // victimIndex = policyHandler.getAddressToReplace(lruOrder);
 
-        if (victimIndex == std::numeric_limits<size_t>::max()) {
+        if (lruOrder.empty()) {
              throw std::runtime_error("Erro: Tentativa de evict em lista LRU vazia.");
         }
+        victimIndex = lruOrder.back();
+        lruOrder.pop_back();
         
         // Removemos do mapa auxiliar de iteradores, pois ele saiu da lista
         lruPos.erase(victimIndex);
@@ -212,9 +226,9 @@ size_t Cache::getLineToEvict() {
 
 // Atualiza estruturas da política de substituição após acesso
 void Cache::updateReplacementPolicy(size_t lineIndex) {
-    if (currentPolicy == ReplacementPolicy::FIFO) {
+    if (currentPolicy == PolicyType::FIFO) {
         return;  // FIFO não requer atualização no acesso
-    } else if (currentPolicy == ReplacementPolicy::LRU) {
+    } else if (currentPolicy == PolicyType::LRU) {
         // Se a linha já está na lista, removemos sua posição antiga
         auto it = lruPos.find(lineIndex);
         if (it != lruPos.end()) {
@@ -228,7 +242,7 @@ void Cache::updateReplacementPolicy(size_t lineIndex) {
 }
 
 // Set e get para a política de substituição
-void Cache::setReplacementPolicy(ReplacementPolicy policy) {
+void Cache::setReplacementPolicy(PolicyType policy) {
     if (currentPolicy == policy) {
         return;
     }
@@ -239,6 +253,52 @@ void Cache::setReplacementPolicy(ReplacementPolicy policy) {
     invalidate();
 }
 
-ReplacementPolicy Cache::getReplacementPolicy() const {
+PolicyType Cache::getReplacementPolicy() const {
     return currentPolicy;
+}
+
+size_t Cache::getUsage() const {
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
+    size_t used = 0;
+    for (const auto& line : lines) {
+        if (line.valid) {
+            used++;
+        }
+    }
+    return used;
+}
+
+size_t Cache::getCapacity() const {
+    return capacity;
+}
+
+void Cache::invalidatePage(uint32_t physicalAddressStart, size_t size, int pid, MemoryManager* mem, PCB* process) {
+    std::lock_guard<std::recursive_mutex> lock(cacheMutex);
+    
+    size_t blockSizeBytes = wordsPerLine * sizeof(uint32_t);
+    
+    // Iterate through all blocks that could be in this page
+    for (uint32_t addr = physicalAddressStart; addr < physicalAddressStart + size; addr += blockSizeBytes) {
+        AddressDecoded info = decodeAddress(addr, pid);
+        
+        auto it = blockTagToLine.find(info.tag);
+        if (it != blockTagToLine.end()) {
+            size_t lineIndex = it->second;
+            
+            // Write back if dirty
+            if (lines[lineIndex].dirty && lines[lineIndex].valid && process != nullptr) {
+                evictLine(lineIndex, mem, *process);
+                // evictLine invalidates the line and removes from map.
+                continue;
+            }
+
+            // Invalidate line (evictLine might have already done this, but let's be sure)
+            lines[lineIndex].valid = false;
+            lines[lineIndex].dirty = false;
+            lines[lineIndex].tag = 0;
+            
+            // Remove from map
+            blockTagToLine.erase(it);
+        }
+    }
 }

@@ -13,16 +13,17 @@
 #include <atomic>
 #include <queue>
 #include <ctime>
+#include <filesystem>
+#include <stdexcept>
 
 #include "../cpu/CONTROL_UNIT.hpp"
-#include "../cpu/pcb_loader.hpp"
 #include "../metrics/metrics.hpp"
 #include "../parser_json/parser_json.hpp"
 #include "../system_config/system_config.hpp"
 #include "../cpu/MemoryManager.hpp"
 #include "../IO/IOManager.hpp"
 #include "../cpu/PCB.hpp"
-#include "../memory/replacement_police.hpp"
+#include "../memory/replacementPolicy.hpp"
 #include "../process_scheduler/process_scheduler.hpp"
 #include "../cpu/core.hpp"
 
@@ -33,10 +34,11 @@ public:
 
 private:
     bool loadProcesses();
-    bool loadProcessDefinition(const std::string &pcbFile,
+    bool loadProcessDefinition(
                                const std::string &taskLabel,
                                const std::string &taskFile,
-                               uint32_t baseAddress = 0);
+                               uint32_t baseAddress = 0,
+                               int pid = 0);
     void moveUnblockedProcesses();
     void executeProcesses();
     void handleCompletion(PCB &process, int &finishedProcesses);
@@ -46,17 +48,29 @@ private:
                               int &finishedProcesses);
     bool allCoresIdle(const std::vector<PCB *> &coreAssignments) const;
 
+    struct MemoryUsageRecord {
+        long long timestamp;
+        double cacheUsage;
+        double ramUsage;
+        double diskUsage;
+    };
+    std::vector<MemoryUsageRecord> memoryUsageHistory;
+    void collectMemoryMetrics();
+    void saveMemoryMetrics();
+
     SystemConfig config;
     MemoryManager memManager;
-    IOManager ioManager;
 
     std::vector<std::unique_ptr<PCB>> processList;
     std::vector<PCB *> readyQueue;
     mutable std::mutex readyQueueMutex;
     std::vector<PCB *> blockedQueue;
     mutable std::mutex blockedQueueMutex;
+    std::vector<PCB *> finishedQueue;
+    mutable std::mutex finishedQueueMutex;
     std::unique_ptr<ProcessScheduler> scheduler;
     mutable std::mutex printMutex;
+    IOManager ioManager;
 };
 
 #endif // SIMULATOR_HPP

@@ -7,6 +7,15 @@ void print_metrics(const PCB &pcb) {
     std::cout << "Nome do Processo:       " << pcb.name << "\n";
     std::cout << "Estado Final:           "
               << (pcb.state.load() == State::Finished ? "Finished" : "Incomplete") << "\n";
+    
+    std::cout << "Tempo de Chegada:       " << pcb.arrivalTime << "\n";
+    std::cout << "Tempo de Início:        " << pcb.startTime << "\n";
+    std::cout << "Tempo de Término:       " << pcb.finishTime << "\n";
+    std::cout << "Burst Time (CPU):       " << pcb.burstTime << " ciclos\n";
+    std::cout << "Turnaround Time:        " << pcb.turnaroundTime << "\n";
+    std::cout << "Waiting Time:           " << pcb.waitingTime << "\n";
+    std::cout << "Response Time:          " << pcb.responseTime << "\n";
+  
     std::cout << "Timestamp Final:        " << pcb.timeStamp << "\n";
     std::cout << "Ciclos de Pipeline:     " << pcb.pipeline_cycles.load() << "\n";
     std::cout << "Ciclos de IO:           " << pcb.io_cycles.load() << "\n";
@@ -14,8 +23,12 @@ void print_metrics(const PCB &pcb) {
     std::cout << "  - Leituras:             " << pcb.mem_reads.load() << "\n";
     std::cout << "  - Escritas:             " << pcb.mem_writes.load() << "\n";
     std::cout << "Acessos a Cache L1:     " << pcb.cache_mem_accesses.load() << "\n";
-    std::cout << "  - Cache Hits:             " << pcb.cache_hits.load() << "\n";
-    std::cout << "  - Cache Misses:           " << pcb.cache_misses.load() << "\n";
+    std::cout << "  - Reads:     " << pcb.cache_read_accesses.load() << "\n";
+    std::cout << "     - Hits:    " << pcb.cache_read_hits.load() << "\n";
+    std::cout << "     - Misses:    " << pcb.cache_read_misses.load() << "\n";
+    std::cout << "  - Writes:    " << pcb.cache_write_accesses.load() << "\n";
+    std::cout << "     - Hits:    " << pcb.cache_write_hits.load() << "\n";
+    std::cout << "     - Misses:    " << pcb.cache_write_misses.load() << "\n";
     std::cout << "Acessos a Mem Principal:" << pcb.primary_mem_accesses.load() << "\n";
     std::cout << "Acessos a Mem Secundaria:" << pcb.secondary_mem_accesses.load() << "\n";
     std::cout << "Ciclos Totais de Memoria: " << pcb.memory_cycles.load() << "\n";
@@ -24,8 +37,8 @@ void print_metrics(const PCB &pcb) {
     for (const auto& core : pcb.coresAssigned) {
         std::cout << core << " ";
     }
-    std::cout << "\nSaída do Programa:\n";
-    
+    std::cout << "\nSaída do Programa (PID " << pcb.pid << "):\n";
+
     if (programOutput.empty()) {
         std::cout << "  (Sem saída registrada)\n";
     } else {
@@ -51,10 +64,26 @@ void print_metrics(const PCB &pcb) {
             resultados << "=== Resultados de Execução ===\n";
         }
         resultados << "\n[Processo PID " << pcb.pid << "] " << pcb.name << "\n";
+        resultados << "Tempo Chegada: " << pcb.arrivalTime
+                << " | Início: " << pcb.startTime
+                << " | Fim: " << pcb.finishTime << "\n";
+
+        resultados << "BurstTime: " << pcb.burstTime << "\n";
+
+        resultados << "Turnaround: " << pcb.turnaroundTime
+                << " | Waiting: " << pcb.waitingTime
+                << " | Response: " << pcb.responseTime << "\n";
+      
         resultados << "Quantum: " << pcb.quantum << " | Timestamp: " << pcb.timeStamp << " | Prioridade: " << pcb.priority << "\n";
         resultados << "Ciclos de Pipeline: " << pcb.pipeline_cycles << "\n";
         resultados << "Ciclos de Memória: " << pcb.memory_cycles << "\n";
-        resultados << "Cache Hits: " << pcb.cache_hits << " | Cache Misses: " << pcb.cache_misses << "\n";
+        resultados << "Acessos a Cache L1:     " << pcb.cache_mem_accesses.load() << "\n";
+        resultados << "  - Reads:     " << pcb.cache_read_accesses.load() << "\n";
+        resultados << "     - Hits:    " << pcb.cache_read_hits.load() << "\n";
+        resultados << "     - Misses:    " << pcb.cache_read_misses.load() << "\n";
+        resultados << "  - Writes:    " << pcb.cache_write_accesses.load() << "\n";
+        resultados << "     - Hits:    " << pcb.cache_write_hits.load() << "\n";
+        resultados << "     - Misses:    " << pcb.cache_write_misses.load() << "\n";
         resultados << "Ciclos de IO: " << pcb.io_cycles << "\n";
         resultados << "Tempo Total de Execução: " << pcb.totalTimeExecution() << "\n";
         resultados << "Cores Utilizados: ";
@@ -62,7 +91,7 @@ void print_metrics(const PCB &pcb) {
             resultados << core << " ";
         }
         resultados << "\n";
-        resultados << "Saída do Programa:\n";
+        resultados << "Saída do Programa (PID " << pcb.pid << "):\n";
         if (programOutput.empty()) {
             resultados << "  (Sem saída registrada)\n";
         } else {
@@ -80,7 +109,7 @@ void print_metrics(const PCB &pcb) {
             output << "=== Saída Lógica do Programa ===\n";
         }
         output << "\n[Programa: " << pcb.name << " | PID " << pcb.pid << "]\n";
-        output << "Saída declarada:\n";
+        output << "Saída declarada (PID " << pcb.pid << "):\n";
         if (programOutput.empty()) {
             output << "  (Sem saída registrada)\n";
         } else {

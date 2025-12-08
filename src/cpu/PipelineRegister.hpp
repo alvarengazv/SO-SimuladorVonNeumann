@@ -8,6 +8,7 @@
 using namespace std;
 
 struct Instruction_Data {
+    int epoch = 0;
     string source_register;
     string target_register;
     string destination_register;
@@ -29,6 +30,7 @@ struct Instruction_Data {
     int32_t loadResult = 0;
     bool hasLoadResult = false;
     int32_t storeValue = 0;
+    uint32_t pc;
 };
 
 struct PipelineToken {
@@ -46,6 +48,11 @@ public:
     void flush();
     void stop();
     bool empty() const;
+
+    // Auxiliares de debug (somente leitura, thread-safe)
+    bool debugHasToken() const;
+    bool debugStopped() const;
+    PipelineToken debugPeek() const;
 
 private:
     mutable std::mutex mutex_;

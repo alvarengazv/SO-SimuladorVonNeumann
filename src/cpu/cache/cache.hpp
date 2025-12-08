@@ -11,8 +11,7 @@
 #include <vector>
 
 #include "../MemoryManager.hpp"
-#include "../../memory/replacement_police.hpp"
-#include "cachePolicy.hpp"
+#include "../../memory/replacementPolicy.hpp"
 #include "../PCB.hpp"
 
 // Forward declarations para evitar ciclo de includes
@@ -20,7 +19,7 @@ class MemoryManager;
 class PCB;
 
 struct AddressDecoded {
-    size_t tag;         // Qual bloco é?
+    size_t tag;         // Qual bloco é? (inclui PID para isolamento)
     size_t wordOffset;  // Qual palavra dentro do bloco?
 };
 
@@ -53,15 +52,15 @@ class Cache {
     std::list<size_t> lruOrder;    // Para LRU
     std::unordered_map<size_t, std::list<size_t>::iterator> lruPos;
 
-    ReplacementPolicy currentPolicy;
-    CachePolicy policyHandler;
+    PolicyType currentPolicy;
+    ReplacementPolicy policyHandler;
 
-    AddressDecoded decodeAddress(uint32_t address) const;
+    AddressDecoded decodeAddress(uint32_t address, int pid) const;
 
     int cache_hits;
     int cache_misses;
 
-    mutable std::mutex cacheMutex;
+    mutable std::recursive_mutex cacheMutex;
 
     size_t getLineToEvict();
     void updateReplacementPolicy(size_t lineIndex);
@@ -69,7 +68,7 @@ class Cache {
     void evictLine(size_t lineIndex, MemoryManager* mem, PCB& process);
 
    public:
-    Cache(size_t numLines, size_t wordsPerLine, ReplacementPolicy policy);
+    Cache(size_t numLines, size_t wordsPerLine, PolicyType policy);
     ~Cache();
 
     // Operações principais
@@ -80,11 +79,16 @@ class Cache {
     int get_misses();
 
     // Configuração
-    void setReplacementPolicy(ReplacementPolicy policy);
-    ReplacementPolicy getReplacementPolicy() const;
+    void setReplacementPolicy(PolicyType policy);
+    PolicyType getReplacementPolicy() const;
 
     // Utilidades
     void invalidate();
+    void invalidatePage(uint32_t physicalAddressStart, size_t size, int pid, MemoryManager* mem, PCB* process);
+
+    // Métricas de uso
+    size_t getUsage() const;
+    size_t getCapacity() const;
 };
 
 #endif

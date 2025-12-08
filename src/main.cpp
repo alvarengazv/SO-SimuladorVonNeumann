@@ -4,6 +4,16 @@
 #include "simulator/simulator.hpp"
 
 int main() {
+    #ifdef _WIN32
+        system("cls");
+    #else
+        system("clear");
+    #endif
+
+    std::cout << "I------------------------------------------------I\n";
+    std::cout << "I--- Simulador de Arquitetura de Von Neumann  ---I\n";
+    std::cout << "I------------------------------------------------I\n";
+    
     try {
         Simulator simulator;
         return simulator.run();

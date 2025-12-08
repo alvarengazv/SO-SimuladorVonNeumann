@@ -1,14 +1,53 @@
-[FWD] reg=s1 <- LOAD op=LW idx=35 value=25
-[FWD] reg=s2 <- ALU op=ADD idx=36 value=40
-[FWD] reg=s3 <- LOAD op=LW idx=38 value=5
-[FWD] reg=s3 <- LOAD op=LW idx=38 value=5
-[FWD] reg=t8 <- LOAD op=LW idx=41 value=10
-[FWD] reg=t0 <- LOAD op=LW idx=2 value=20
-[FWD] reg=t1 <- LOAD op=LW idx=13 value=5
-[FWD] reg=t2 <- LOAD op=LW idx=15 value=10
-[FWD] reg=t2 <- LOAD op=LW idx=15 value=10
-[FWD] reg=t0 <- LOAD op=LW idx=6 value=3
-[FWD] reg=t2 <- ALU op=ADD idx=8 value=0
-[FWD] reg=t3 <- ALU op=ADD idx=9 value=0
-[FWD] reg=t4 <- LOAD op=LW idx=12 value=3
-[FWD] reg=t5 <- ALU op=ADD idx=13 value=3
+[FWD] reg=t0 <- ALU value=100
+[FWD] reg=t1 <- ALU value=5
+[FWD] reg=t0 <- ALU value=100
+[FWD] reg=t1 <- ALU value=5
+[FWD] reg=t0 <- ALU value=0
+[FWD] reg=t1 <- LOAD value=5
+[FWD] reg=s2 <- ALU value=40
+[FWD] reg=t0 <- LOAD value=20
+[FWD] reg=t1 <- ALU value=4
+[FWD] reg=t0 <- ALU value=19
+[FWD] reg=t2 <- ALU value=8
+[FWD] reg=t3 <- ALU value=12
+[FWD] reg=t4 <- LOAD value=6
+[FWD] reg=t5 <- ALU value=18
+[FWD] reg=t8 <- ALU value=9
+[FWD] reg=t2 <- ALU value=11
+[FWD] reg=t8 <- ALU value=8
+[FWD] reg=t8 <- ALU value=8
+[FWD] reg=t0 <- ALU value=17
+[FWD] reg=t2 <- ALU value=11
+[FWD] reg=t8 <- LOAD value=7
+[FWD] reg=t8 <- ALU value=6
+[FWD] reg=t2 <- ALU value=11
+[FWD] reg=t8 <- ALU value=5
+[FWD] reg=t0 <- ALU value=16
+[FWD] reg=t8 <- LOAD value=5
+[FWD] reg=t0 <- ALU value=15
+[FWD] reg=t8 <- ALU value=4
+[FWD] reg=t2 <- LOAD value=10
+[FWD] reg=t2 <- ALU value=11
+[FWD] reg=t8 <- ALU value=3
+[FWD] reg=t8 <- LOAD value=3
+[FWD] reg=t0 <- ALU value=14
+[FWD] reg=t8 <- ALU value=2
+[FWD] reg=t8 <- LOAD value=2
+[FWD] reg=t8 <- ALU value=1
+[FWD] reg=t0 <- ALU value=13
+[FWD] reg=t8 <- LOAD value=1
+[FWD] reg=t8 <- ALU value=0
+[FWD] reg=t0 <- ALU value=12
+[FWD] reg=a0 <- ALU value=222
+[FWD] reg=t0 <- ALU value=11
+[FWD] reg=t0 <- ALU value=10
+[FWD] reg=t0 <- ALU value=9
+[FWD] reg=t0 <- ALU value=8
+[FWD] reg=t0 <- ALU value=7
+[FWD] reg=t0 <- ALU value=6
+[FWD] reg=t0 <- ALU value=5
+[FWD] reg=t0 <- ALU value=4
+[FWD] reg=t0 <- ALU value=3
+[FWD] reg=t0 <- ALU value=2
+[FWD] reg=t0 <- ALU value=1
+[FWD] reg=t0 <- ALU value=0

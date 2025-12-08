@@ -25,7 +25,6 @@ MODULE_SRCS := $(wildcard src/cpu/*.cpp) \
                $(wildcard src/IO/*.cpp) \
                $(wildcard src/parser_json/*.cpp) \
                $(wildcard src/process_scheduler/*.cpp) \
-			   $(wildcard src/tasks/*.cpp) \
 			   $(wildcard src/metrics/*.cpp) \
 			   $(wildcard src/simulator/*.cpp) \
                $(wildcard src/cpu/cache/*.cpp) \
@@ -72,7 +71,7 @@ $(TARGET_BANK): $(OBJ_BANK)
 
 clean:
 	@echo "🧹 Limpando arquivos antigos (.o e executáveis)..."
-	@rm -f $(OBJ) $(OBJ_HASH) $(OBJ_BANK) $(TARGET) $(TARGET_HASH) $(TARGET_BANK)
+	@rm -f $(OBJ) $(OBJ_HASH) $(OBJ_BANK) $(TARGET) $(TARGET_HASH) $(TARGET_BANK) $(TARGET_BANK).exe $(TARGET_HASH).exe $(TARGET).exe
 
 run: $(TARGET)
 	@echo "🚀 Executando o Simuador..."

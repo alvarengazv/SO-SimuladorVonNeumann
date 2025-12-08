@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "task_id": "cadeia_forwarding",
+    "name": "forwarding_test",
     "author": "teste",
     "description": "Sequência LW seguida de aritmética dependente, testando o mecanismo de forwarding."
   },
