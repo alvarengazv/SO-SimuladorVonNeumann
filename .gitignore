@@ -9,3 +9,5 @@ src/simulador.exe
 
 # Arquivos de sistema
 .DS_Store
+
+venv/

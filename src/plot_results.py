@@ -108,5 +108,36 @@ def plot_all():
             plt.close()
     except Exception as e: print(f"[ERRO] Page Size: {e}")
 
+    # -------------------------------------------------------
+    # GRÁFICO 4: USO DA MEMÓRIA AO LONGO DO TEMPO
+    # -------------------------------------------------------
+    # Adicionar o tamanho da memória primaria, secundária e cache no gráfico
+    # além do tamanho do pageSize, lineSize, blockSize e politicas de substituição da cache e memoria primaria
+    # e o tipo de escalonador utilizado em uma legenda no gráfico
+
+    try:
+        # nome com data e hora para evitar sobrescrever
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        file = os.path.join(OUTPUT_DIR, f"memory_usage.csv")
+        if os.path.exists(file):
+            df = pd.read_csv(file)
+            plt.figure(figsize=(10, 6))
+            plt.plot(df["Timestamp"], df["CacheUsage(%)"], label='Cache', color='blue')
+            plt.plot(df["Timestamp"], df["RAMUsage(%)"], label='RAM', color='green')
+            plt.plot(df["Timestamp"], df["DiskUsage(%)"], label='Disco', color='red')
+            plt.title('Uso da Memória ao Longo do Tempo')
+            plt.xlabel('Tempo (Ciclos)')
+            plt.ylabel('Uso da Memória (%)')
+            # PrimaryMemorySize,PrimaryMemoryPageSize,PrimaryMemoryPolicy,SecondaryMemorySize,SecondaryMemoryBlockSize,SecondaryMemoryPolicy,CacheSize,CacheLineSize,CachePolicy,NumCores,Scheduler
+            # pegar os valores da primeira linha para colocar na legenda
+            plt.legend(title=f"Tamanho da Memória Primária: {df["PrimaryMemorySize"].iloc[0]} Bytes\nTamanho da Memória Secundária: {df["SecondaryMemorySize"].iloc[0]} Bytes\nCache: {df["CacheSize"].iloc[0]} Bytes\nTamanho da Página: {df["PrimaryMemoryPageSize"].iloc[0]} Bytes\nTamanho da Linha: {df["CacheLineSize"].iloc[0]} Bytes\nPolítica Cache: {df["CachePolicy"].iloc[0]}\nPolítica Memória Primária: {df["PrimaryMemoryPolicy"].iloc[0]}\nEscalonador: {df["Scheduler"].iloc[0]}")
+            plt.grid(True, alpha=0.3)
+            plt.savefig(os.path.join(OUTPUT_DIR, f"grafico_memory_usage_{timestamp}.png"), dpi=300)
+            print(f"[OK] Gerado: grafico_memory_usage_{timestamp}.png")
+            plt.close()
+    except Exception as e: print(f"[ERRO] Memory Usage: {e}")
+
 if __name__ == "__main__":
     plot_all()

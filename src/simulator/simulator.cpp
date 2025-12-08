@@ -191,7 +191,7 @@ void Simulator::executeProcesses() {
 
     reclaimFinishedCores(cpuCores, coreAssignments, idleCoresIdx, finishedProcesses);
     
-    saveMemoryMetrics("output/memory_usage.csv");
+    saveMemoryMetrics();
 
     for (auto &core : cpuCores) {
         core->stop();
@@ -344,14 +344,36 @@ void Simulator::collectMemoryMetrics() {
     memoryUsageHistory.push_back(record);
 }
 
-void Simulator::saveMemoryMetrics(const std::string& filename) {
+void Simulator::saveMemoryMetrics() {
+    ReplacementPolicy rP;
+    // Informações da memória primaria
+    size_t primaryMemorySize = config.main_memory.total;
+    size_t primaryMemoryPageSize = config.main_memory.page_size;
+    std::string primaryMemoryPolicy = rP.getType() == PolicyType::FIFO ? "FIFO" : "LRU";
+
+    // Informações da memória secundária
+    size_t secondaryMemorySize = config.secondary_memory.total;
+    size_t secondaryMemoryBlockSize = config.secondary_memory.block_size;
+
+    // Informações da cache
+    size_t cacheSize = config.cache.size;
+    size_t cacheLineSize = config.cache.line_size;
+    std::string cachePolicy = rP.getType() == PolicyType::FIFO ? "FIFO" : "LRU";
+
+    // Número de Cores
+    size_t numCores = config.cpu.cores;
+
+    // Escalonador
+    std::string schedulerAlgorithm = schedulerName(config.scheduling.algorithm);
+
+    const std::string filename = "output/memory_usage.csv";
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Erro ao abrir arquivo para salvar métricas de memória: " << filename << "\n";
         return;
     }
 
-    file << "Timestamp,CacheUsage(%),RAMUsage(%),DiskUsage(%)\n";
+    file << "Timestamp,CacheUsage(%),RAMUsage(%),DiskUsage(%),PrimaryMemorySize,PrimaryMemoryPageSize,PrimaryMemoryPolicy,SecondaryMemorySize,SecondaryMemoryBlockSize,CacheSize,CacheLineSize,CachePolicy,NumCores,Scheduler\n";
     
     if (memoryUsageHistory.empty()) return;
 
@@ -361,7 +383,17 @@ void Simulator::saveMemoryMetrics(const std::string& filename) {
         file << (record.timestamp - startTime) << ","
              << record.cacheUsage << ","
              << record.ramUsage << ","
-             << record.diskUsage << "\n";
+             << record.diskUsage << ","
+             << primaryMemorySize << ","
+             << primaryMemoryPageSize << ","
+             << primaryMemoryPolicy << ","
+             << secondaryMemorySize << ","
+             << secondaryMemoryBlockSize << ","
+             << cacheSize << ","
+             << cacheLineSize << ","
+             << cachePolicy << ","
+             << numCores << ","
+             << schedulerAlgorithm << "\n";
     }
     
     std::cout << "Métricas de memória salvas em: " << filename << "\n";

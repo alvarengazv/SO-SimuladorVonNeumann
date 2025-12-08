@@ -56,7 +56,7 @@ private:
     };
     std::vector<MemoryUsageRecord> memoryUsageHistory;
     void collectMemoryMetrics();
-    void saveMemoryMetrics(const std::string& filename);
+    void saveMemoryMetrics();
 
     SystemConfig config;
     MemoryManager memManager;

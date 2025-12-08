@@ -157,7 +157,7 @@ def parse_results(cores=1):
         et = re.search(r'Tempo Total de Execução:\s*(\d+)', block)
         if et: metrics['exec_time'] = int(et.group(1))
         
-        mem = re.search(r'Ciclos Totais de Memoria:\s*(\d+)', block)
+        mem = re.search(r'Ciclos de Memória:\s*(\d+)', block)
         if mem: metrics['mem_cycles'] = int(mem.group(1))
         
         miss = re.search(r'- Misses:\s*(\d+)', block)
