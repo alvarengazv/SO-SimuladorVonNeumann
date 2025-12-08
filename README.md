@@ -4,13 +4,12 @@
 
 <h1 align="center">
 Simulador para a Arquitetura 
-
-de Von Neumann e Pipeline MIPS
+de Von Neumann  Multicore com Escalonamento e Gerência de Memória
 </h1>
 
 
 <div align="justify">
-  <p>Esse é um repositório voltado para a simulação computacional de uma arquitetura de Von Neumann que utiliza o pipeline MIPS, proposta como trabalho de aquecimento da disciplina de Sistemas Operacionais do CEFET-MG Campus V pelo professor Michel Pires da Silva em 2025.</p>
+  <p>Esse é um repositório voltado para um simulador de arquitetura Von Neumann multicore baseado em MIPS, suportando uma pipeline de cinco estágios e memória virtual da disciplina de Sistemas Operacionais do CEFET-MG Campus V pelo professor Michel Pires da Silva em 2025.</p>
 </div>
 
 ![C++](https://img.shields.io/badge/C%2B%2B-17-blue)
@@ -18,6 +17,302 @@ de Von Neumann e Pipeline MIPS
 ![DevContainers](https://img.shields.io/badge/VSCode-Dev%20Containers-23a)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+---
+
+## 📖 Índice
+
+- [Introdução](#introdução)
+- [Configuração da Máquina](#configuração-da-máquina)
+  - [Pré-requisitos](#pré-requisitos)
+  - [Configuração do Sistema](#configuração-do-sistema)
+- [Execução](#execução)
+- [Link do Artigo](#link-do-artigo)
+
+---
+
+## 1. 📝 Introdução
+
+### Visão Geral
+O simulador opera como uma máquina virtual completa, capaz de processar instruções MIPS através de uma abordagem híbrida de paralelismo. Ele não apenas emula o resultado das instruções, mas simula o comportamento temporal e estrutural do hardware.
+
+As principais funcionalidades incluem:
+
+* **Arquitetura Multicore Real:** Implementação de `CPUCore` com threads *worker* dedicadas, permitindo paralelismo a nível de thread (TLP) real entre processos.
+* **Pipeline MIPS Avançado:** Execução em 5 estágios (IF, ID, EX, MEM, WB) onde cada estágio possui sua própria thread, garantindo paralelismo a nível de instrução (ILP).
+* **Gerenciamento de Memória Robusto:** Sistema completo com MMU, tradução de endereços via *page table*, tratamento de *page faults* e hierarquia de memória (Cache L1 $\to$ RAM $\to$ Disco).
+* **Sincronização Thread-Safe:** Uso de primitivas modernas do C++17 (mutexes, variáveis de condição e operações atômicas) para garantir a integridade dos dados em ambiente concorrente.
+* **Register Forwarding:** Implementação de adiantamento de dados para resolução automática de conflitos (data hazards).
+
+### Evolução do Projeto
+Em comparação com implementações anteriores, este trabalho introduz mudanças estruturais significativas:
+
+> **De Simulação Sequencial para Paralelismo Híbrido:**
+> Diferente de versões anteriores que apenas iteravam sobre núcleos, este projeto implementa núcleos independentes que competem por recursos reais do sistema hospedeiro, exigindo mecanismos de sincronização complexos.
+
+> **De Memória Estática para Virtualização Completa:**
+> A introdução de paginação e memória virtual permite a execução de múltiplos processos isolados, com alocação dinâmica de frames e suporte a *swapping*, superando o modelo de memória física contígua simples.
+
+> **De Execução Simples para Métricas Detalhadas:**
+> O sistema agora monitora granularmente o desempenho, fornecendo relatórios precisos sobre *cache hits*, ciclos de stall, latência de I/O e trocas de contexto.
+
+---
+
+## 2. ⚙️ Configuração
+
+### Pré-requisitos
+O ambiente requer apenas um **Compilador C++17** (GCC, Clang ou MSVC) e **CMake** (3.10+) instalados.
+
+### 2.1 Arquivo `system_config.json`
+
+Todo o comportamento do hardware e do sistema operacional é definido no arquivo `src/system_config/system_config.json`. Este arquivo funciona como a "BIOS" e o setup do SO, permitindo alterações sem necessidade de recompilação.
+
+#### Estrutura Completa
+
+```json
+{
+    "main_memory": {
+        "total": 8192,
+        "page_size": 256,
+        "weight": 50
+    },
+    "secondary_memory": {
+        "total": 65536,
+        "block_size": 512,
+        "weight": 500
+    },
+    "cache": {
+        "size": 64,
+        "line_size": 64,
+        "weight": 1,
+        "policy": 1
+    },
+    "cpu": {
+        "cores": 4
+    },
+    "scheduling": {
+        "algorithm": 0
+    }
+}
+```
+
+#### Parâmetros Detalhados
+
+##### **CPU (`cpu`)**
+| Parâmetro | Tipo | Descrição | Valores Típicos |
+| :--- | :--- | :--- | :--- |
+| `cores` | `int` | Quantidade de núcleos (threads worker) ativos no sistema. Cada núcleo executa processos independentemente. | 1-8 (depende do hardware hospedeiro) |
+
+**Impacto:** Aumentar o número de cores permite maior paralelismo real (TLP), mas consome mais recursos do sistema hospedeiro.
+
+---
+
+##### **Cache L1 (`cache`)**
+| Parâmetro | Tipo | Descrição | Valores Típicos |
+| :--- | :--- | :--- | :--- |
+| `size` | `int` | Número total de linhas na Cache L1. Define a capacidade de armazenamento da cache. | 16-256 linhas |
+| `line_size` | `int` | Tamanho (em bytes) de cada linha da cache. Determina a granularidade de transferência. | 16, 32, 64, 128 bytes |
+| `weight` | `int` | Custo em ciclos de clock para acessar a cache (latência). | 1-5 ciclos |
+| `policy` | `int` | Política de substituição da cache: <br>`0` = FIFO (First-In-First-Out) <br>`1` = LRU (Least Recently Used) | 0 ou 1 |
+
+**Impacto:** 
+- **`size`**: Cache maior reduz *cache misses*, mas aumenta o custo de busca.
+- **`line_size`**: Linhas maiores melhoram a localidade espacial, mas desperdiçam espaço se os dados não forem contíguos.
+- **`weight`**: Define o tempo de resposta da cache (normalmente muito baixo).
+
+**Exemplo:**
+- Cache de 64 linhas × 64 bytes = 4KB de capacidade total.
+
+---
+
+##### **Memória Principal (`main_memory`)**
+| Parâmetro | Tipo | Descrição | Valores Típicos |
+| :--- | :--- | :--- | :--- |
+| `total` | `int` | Tamanho total da RAM em bytes. Define o espaço físico disponível para frames. | 4096-65536 bytes (simulação) |
+| `page_size` | `int` | Tamanho de cada página/frame em bytes. Deve ser potência de 2. | 256, 512, 1024, 4096 bytes |
+| `weight` | `int` | Custo em ciclos para acessar a RAM (latência). Representa o tempo de resposta da memória. | 50-200 ciclos |
+
+**Impacto:**
+- **`total`**: Define quantos processos simultâneos podem ser executados antes de exigir *swapping* para o disco.
+- **`page_size`**: Páginas maiores reduzem a fragmentação interna, mas aumentam o desperdício de memória se o processo usar pouco espaço.
+- **`weight`**: Latência alta da RAM incentiva o uso da cache.
+
+**Cálculo do Número de Frames:**
+```
+Número de frames = total / page_size
+Exemplo: 8192 bytes / 256 bytes = 32 frames
+```
+
+---
+
+##### **Memória Secundária (`secondary_memory`)**
+| Parâmetro | Tipo | Descrição | Valores Típicos |
+| :--- | :--- | :--- | :--- |
+| `total` | `int` | Tamanho total do disco virtual em bytes. Define o espaço disponível para *swapping*. | 32768-131072 bytes |
+| `block_size` | `int` | Tamanho do bloco de transferência entre disco e RAM (em bytes). | 256, 512, 1024 bytes |
+| `weight` | `int` | Custo em ciclos para acessar o disco (latência de I/O). Simula a lentidão de dispositivos de armazenamento. | 500-2000 ciclos |
+
+**Impacto:**
+- **`total`**: Deve ser maior que `main_memory.total` para permitir *swapping* efetivo.
+- **`block_size`**: Blocos maiores reduzem o número de operações de I/O, mas transferem dados desnecessários.
+- **`weight`**: Alta latência do disco penaliza *page faults*, incentivando otimização de memória.
+
+---
+
+##### **Escalonamento (`scheduling`)**
+| Parâmetro | Tipo | Descrição | Valores Possíveis |
+| :--- | :--- | :--- | :--- |
+| `algorithm` | `int` | Política de escalonamento: <br>`0` = **Round-Robin** <br>`1` = **Shortest Job First (SJF)** <br>`2` = **Lottery** <br>`3` = **Priority** <br>Qualquer outro valor → **FCFS** (default). | 0, 1, 2 ou 3 (outros caem em FCFS) |
+
+**Descrição dos Algoritmos:**
+
+1. **Round-Robin (0):** Cada processo recebe uma fatia de tempo (*time quantum*); ao expirar, volta ao fim da fila. Bom para cenários interativos.
+
+2. **Shortest Job First — SJF (1):** Executa primeiro os processos com menor tempo estimado (número de instruções). Reduz tempo médio de espera, mas requer boa estimativa.
+
+3. **Lottery (2):** Seleciona próximo processo por sorteio proporcional aos “tickets”. Dá chance a todos e reduz *starvation* em cargas mistas.
+
+4. **Priority (3):** Processos com maior prioridade executam antes. Pode causar *starvation* em prioridades baixas.
+
+5. **FCFS (default):** O primeiro processo a chegar na fila é o primeiro a ser executado.
+
+
+---
+
+### 2.2 Criando Processos (Arquivos `tasks/*.json`)
+
+Os processos são definidos em arquivos JSON na pasta `src/tasks/`. Cada arquivo representa um programa MIPS.
+
+#### Estrutura Básica
+
+```json
+{
+  "metadata": { 
+    "name": "nome_processo",
+    "description": "Descrição breve"
+  },
+  "data": { 
+    "variavel": valor,
+    "array": [val1, val2, ...]
+  },
+  "program": [
+    { "instruction": "tipo", "parametros": "..." }
+  ]
+}
+```
+
+- **`metadata`**: Nome e descrição do processo.
+- **`data`**: Variáveis e arrays alocados na memória.
+- **`program`**: Lista de instruções MIPS.
+
+---
+
+### 2.3 Principais Instruções MIPS
+
+#### **Aritméticas/Lógicas (Tipo R)**
+```json
+{ "instruction": "add", "rd": "$t0", "rs": "$t1", "rt": "$t2" }  // $t0 = $t1 + $t2
+{ "instruction": "sub", "rd": "$t0", "rs": "$t1", "rt": "$t2" }  // $t0 = $t1 - $t2
+{ "instruction": "mult", "rd": "$t0", "rs": "$t1", "rt": "$t2" } // $t0 = $t1 * $t2
+{ "instruction": "div", "rd": "$t0", "rs": "$t1", "rt": "$t2" }  // $t0 = $t1 / $t2
+{ "instruction": "and", "rd": "$t0", "rs": "$t1", "rt": "$t2" }  // $t0 = $t1 & $t2
+{ "instruction": "or", "rd": "$t0", "rs": "$t1", "rt": "$t2" }   // $t0 = $t1 | $t2
+```
+
+#### **Imediatos (Tipo I)**
+```json
+{ "instruction": "li", "rt": "$t0", "immediate": 42 }            // $t0 = 42
+{ "instruction": "addi", "rt": "$t0", "rs": "$t1", "immediate": 10 } // $t0 = $t1 + 10
+```
+
+#### **Memória**
+```json
+{ "instruction": "lw", "rt": "$t0", "base": "variavel" }         // Carrega variável
+{ "instruction": "lw", "rt": "$t0", "offset": 2, "base": "array" } // array[2]
+{ "instruction": "sw", "rt": "$t0", "base": "resultado" }        // Salva variável
+```
+
+#### **Desvios**
+```json
+{ "instruction": "beq", "rs": "$t0", "rt": "$zero", "dest": "fim" } // Se $t0 == 0, vai para "fim"
+{ "instruction": "bgt", "rs": "$t0", "rt": "$t1", "dest": "maior" } // Se $t0 > $t1, vai para "maior"
+{ "instruction": "j", "dest": "loop" }                           // Salto incondicional
+```
+
+#### **Especiais**
+```json
+{ "instruction": "print", "rt": "$t0" }  // Imprime valor de $t0
+{ "instruction": "end" }                 // Finaliza processo
+```
+
+---
+
+### 2.4 Exemplo: Contador Simples
+
+**Arquivo:** `src/tasks/contador.json`
+
+```json
+{
+  "metadata": { 
+    "name": "contador",
+    "description": "Contagem regressiva de 5 até 0"
+  },
+  "data": { 
+    "valor": 5
+  },
+  "program": [
+    { "instruction": "lw", "rt": "$t0", "base": "valor" },
+    { "label": "loop", "instruction": "beq", "rs": "$t0", "rt": "$zero", "dest": "fim" },
+    { "instruction": "print", "rt": "$t0" },
+    { "instruction": "addi", "rt": "$t0", "rs": "$t0", "immediate": -1 },
+    { "instruction": "j", "dest": "loop" },
+    { "label": "fim", "instruction": "end" }
+  ]
+}
+```
+
+**Funcionamento:**
+1. Carrega `valor = 5` no registrador `$t0`
+2. Loop: Se `$t0 == 0`, vai para "fim"
+3. Imprime o valor de `$t0`
+4. Decrementa `$t0` em 1
+5. Volta para o loop
+6. Finaliza quando chegar em 0
+
+---
+
+## 3. 🚀 Execução
+
+### Compilação
+O projeto utiliza um `Makefile` que abstrai os comandos do CMake.
+
+1.  **Compilar o projeto:**
+    ```bash
+    make
+    ```
+    Isso criará a pasta `build`, gerará os arquivos do CMake e compilará o executável.
+
+2.  **Limpar arquivos temporários:**
+    Caso precise recompilar do zero:
+    ```bash
+    make clean
+    ```
+
+
+
+## 📄 Link do Artigo
+
+**[Link do artigo será adicionado aqui]**
+
+---
+
+<br><br><br>
+
+## 📚 Documentação do Projeto Base (Trabalho Anterior)
+
+<details>
+<summary><b>Clique aqui para expandir a documentação do trabalho anterior</b></summary>
+
+<br>
 
 ## 📖: Índice
 
@@ -845,3 +1140,9 @@ O `CMakeLists.txt` foi configurado para criar atalhos úteis que você pode usar
 [linkedin-autor4]: https://www.linkedin.com/in/dudatsouza/
 [telegram-autor4]: https://t.me/
 [gmail-autor4]: mailto:dudateixeirasouza@gmail.com
+
+</details>
+
+---
+
+<p align="right">(<a href="#readme-topo">voltar ao topo</a>)</p>
